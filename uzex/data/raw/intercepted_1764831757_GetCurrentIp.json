@@ -1,0 +1,5 @@
+{
+  "url": "https://xarid-api-trade.uzex.uz/Info/GetCurrentIp",
+  "request_payload": null,
+  "response_data": "83.222.6.24"
+}
