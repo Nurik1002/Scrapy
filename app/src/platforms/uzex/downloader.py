@@ -65,6 +65,8 @@ class UzexDownloader:
         status: str = "completed",
         target: int = None,
         start_from: int = 1,
+        resume: bool = True,
+        skip_existing: bool = True,
         on_lot: Callable[[LotData], None] = None,
     ) -> DownloadStats:
         """
@@ -75,9 +77,25 @@ class UzexDownloader:
             status: Status (completed, active)
             target: Stop after N lots
             start_from: Start index
+            resume: Continue from last checkpoint
+            skip_existing: Skip already-downloaded lots
             on_lot: Callback for each lot
         """
+        from src.core.checkpoint import get_checkpoint_manager
+        
         logger.info(f"Downloading {status} {lot_type} lots...")
+        
+        # Initialize checkpoint manager
+        checkpoint = await get_checkpoint_manager("uzex", f"{lot_type}_{status}")
+        
+        # Resume from checkpoint if available
+        if resume:
+            saved = await checkpoint.load_checkpoint()
+            if saved:
+                start_from = saved.get("last_index", 1)
+                self.stats.found = saved.get("found", 0)
+                self.stats.processed = saved.get("processed", 0)
+                logger.info(f"📍 Resuming from index {start_from} (found: {self.stats.found})")
         
         # Setup save directory
         if self.save_raw:
@@ -122,6 +140,12 @@ class UzexDownloader:
                 
                 # Process lots
                 for item in data:
+                    lot_id = item.get("lot_id")
+                    
+                    # Skip if already seen
+                    if skip_existing and await checkpoint.is_seen(lot_id):
+                        continue
+                    
                     lot = parser.parse_lot(item, lot_type, status)
                     if lot:
                         self.stats.found += 1
@@ -132,6 +156,9 @@ class UzexDownloader:
                             if items:
                                 lot.items = parser.parse_lot_items(items)
                         
+                        # Mark as seen
+                        await checkpoint.mark_seen([lot_id])
+                        
                         # Save raw
                         if self.save_raw:
                             await self._save_raw(lot)
@@ -141,6 +168,14 @@ class UzexDownloader:
                             on_lot(lot)
                 
                 self.stats.processed += len(data)
+                
+                # Save checkpoint every batch
+                await checkpoint.save_checkpoint({
+                    "last_index": from_idx + self.batch_size,
+                    "found": self.stats.found,
+                    "processed": self.stats.processed,
+                    "total_available": total_count,
+                })
                 
                 # Log progress
                 logger.info(
@@ -160,6 +195,7 @@ class UzexDownloader:
         
         finally:
             await self.client.close()
+            await checkpoint.close()
         
         logger.info(f"✅ Done! Found {self.stats.found:,} lots")
         return self.stats
@@ -240,6 +276,8 @@ async def main():
                     choices=['auction', 'shop', 'national', 'categories', 'products'])
     ap.add_argument('--status', '-s', default='completed', choices=['completed', 'active'])
     ap.add_argument('--target', '-n', type=int, default=100)
+    ap.add_argument('--no-resume', action='store_true', help='Start fresh, ignore checkpoint')
+    ap.add_argument('--no-skip', action='store_true', help='Re-download already seen lots')
     
     args = ap.parse_args()
     
@@ -254,6 +292,8 @@ async def main():
             lot_type=args.type,
             status=args.status,
             target=args.target,
+            resume=not args.no_resume,
+            skip_existing=not args.no_skip,
         )
 
 
