@@ -1,3 +1,0 @@
-scrapy>=2.11.0
-scrapy-playwright>=0.0.33
-psycopg2-binary>=2.9.9
