@@ -56,25 +56,67 @@ def process_pending(self, platform: str, batch_size: int = 100) -> dict:
             )
             snapshots = result.scalars().all()
             
+            if not snapshots:
+                return stats
+
+            # Buffers for bulk operations
+            from src.core.bulk_ops import (
+                bulk_upsert_products, 
+                bulk_upsert_sellers, 
+                bulk_upsert_skus, 
+                bulk_insert_price_history
+            )
+            
+            products_buffer = []
+            sellers_buffer = []
+            skus_buffer = []
+            prices_buffer = []
+            categories_buffer = [] # Categories are still individual mostly due to hierarchy, or can be bulked too
+            # For simplicity, let's keep categories individual or add bulk op later. 
+            # Actually, let's just do categories individually for now as they are fewer.
+            
+            snapshot_map = {} # Map valid parsed data back to snapshot for status update
+            
+            from src.core.models import Category
+            
             for snapshot in snapshots:
                 try:
-                    # Parse product
                     parsed = parser.parse_product(snapshot.raw_json)
                     if not parsed:
                         continue
+                        
+                    # Prepare product dict
+                    p_data = {
+                        "id": parsed.id,
+                        "title": parsed.title,
+                        "title_normalized": parser.normalize_title(parsed.title),
+                        "category_id": parsed.category_id,
+                        "seller_id": parsed.seller_id,
+                        "rating": parsed.rating,
+                        "review_count": parsed.review_count,
+                        "order_count": parsed.order_count,
+                        "is_available": parsed.is_available,
+                        "total_available": parsed.total_available,
+                        "description": parsed.description,
+                        "photos": parsed.photos,
+                        "raw_data": parsed.raw_data,
+                    }
+                    products_buffer.append(p_data)
                     
-                    # Upsert seller
+                    # Prepare seller dict
                     if parsed.seller_data:
-                        seller = Seller(
-                            id=parsed.seller_id,
-                            platform=platform,
-                            title=parsed.seller_title,
+                        s_data = {
+                            "id": parsed.seller_id,
+                            "title": parsed.seller_title,
                             **{k: v for k, v in parsed.seller_data.items() 
-                               if k in ['link', 'rating', 'description', 'account_id']}
-                        )
-                        await session.merge(seller)
-                    
-                    # Upsert categories
+                               if k in ['link', 'rating', 'description', 'account_id', 'reviews', 'orders']}
+                        }
+                        # Normalize keys for bulk op
+                        if 'reviews' in s_data: s_data['review_count'] = s_data.pop('reviews')
+                        if 'orders' in s_data: s_data['order_count'] = s_data.pop('orders')
+                        sellers_buffer.append(s_data)
+
+                    # Upsert categories (still individual for now to ensure consistency)
                     for cat_data in (parsed.category_path or []):
                         cat = Category(
                             id=cat_data['id'],
@@ -82,62 +124,58 @@ def process_pending(self, platform: str, batch_size: int = 100) -> dict:
                             title=cat_data['title'],
                         )
                         await session.merge(cat)
-                    
-                    # Upsert product
-                    product = Product(
-                        id=parsed.id,
-                        platform=platform,
-                        title=parsed.title,
-                        title_normalized=parser.normalize_title(parsed.title),
-                        category_id=parsed.category_id,
-                        seller_id=parsed.seller_id,
-                        rating=parsed.rating,
-                        review_count=parsed.review_count,
-                        order_count=parsed.order_count,
-                        is_available=parsed.is_available,
-                        total_available=parsed.total_available,
-                        description=parsed.description,
-                        photos=parsed.photos,
-                        raw_data=parsed.raw_data,
-                    )
-                    await session.merge(product)
-                    
-                    # Upsert SKUs + price history
+
+                    # Prepare SKUs and Prices
                     for sku_data in (parsed.skus or []):
-                        sku = SKU(
-                            id=sku_data['id'],
-                            product_id=parsed.id,
-                            full_price=sku_data.get('full_price'),
-                            purchase_price=sku_data.get('purchase_price'),
-                            discount_percent=sku_data.get('discount_percent'),
-                            available_amount=sku_data.get('available_amount', 0),
-                            barcode=sku_data.get('barcode'),
-                            characteristics=sku_data.get('characteristics'),
-                        )
-                        await session.merge(sku)
+                        sku_entry = {
+                            "id": sku_data['id'],
+                            "product_id": parsed.id,
+                            "full_price": sku_data.get('full_price'),
+                            "purchase_price": sku_data.get('purchase_price'),
+                            "discount_percent": sku_data.get('discount_percent'),
+                            "available_amount": sku_data.get('available_amount', 0),
+                            "barcode": sku_data.get('barcode'),
+                            "characteristics": sku_data.get('characteristics'),
+                        }
+                        skus_buffer.append(sku_entry)
                         
-                        # Add price history
-                        price_record = PriceHistory(
-                            sku_id=sku_data['id'],
-                            product_id=parsed.id,
-                            full_price=sku_data.get('full_price'),
-                            purchase_price=sku_data.get('purchase_price'),
-                            discount_percent=sku_data.get('discount_percent'),
-                            available_amount=sku_data.get('available_amount', 0),
-                        )
-                        session.add(price_record)
+                        price_entry = {
+                            "sku_id": sku_data['id'],
+                            "product_id": parsed.id,
+                            "full_price": sku_data.get('full_price'),
+                            "purchase_price": sku_data.get('purchase_price'),
+                            "discount_percent": sku_data.get('discount_percent'),
+                            "available_amount": sku_data.get('available_amount', 0),
+                        }
+                        prices_buffer.append(price_entry)
                     
-                    # Mark as processed
-                    snapshot.processed = True
-                    snapshot.processed_at = datetime.now(timezone.utc)
-                    
+                    # Track successful parse
+                    snapshot_map[snapshot.id] = snapshot
                     stats["success"] += 1
                     
                 except Exception as e:
-                    logger.error(f"Error processing snapshot {snapshot.id}: {e}")
+                    logger.error(f"Error parsing snapshot {snapshot.id}: {e}")
                     stats["errors"] += 1
                 
                 stats["processed"] += 1
+            
+            # Execute Bulk Operations
+            if sellers_buffer:
+                await bulk_upsert_sellers(session, sellers_buffer, platform)
+            
+            if products_buffer:
+                await bulk_upsert_products(session, products_buffer, platform)
+                
+            if skus_buffer:
+                await bulk_upsert_skus(session, skus_buffer)
+                
+            if prices_buffer:
+                await bulk_insert_price_history(session, prices_buffer)
+            
+            # Update snapshots status
+            for snap_id, snapshot in snapshot_map.items():
+                snapshot.processed = True
+                snapshot.processed_at = datetime.now(timezone.utc)
             
             await session.commit()
         
@@ -185,8 +223,23 @@ def process_raw_files(platform: str, directory: str = None) -> dict:
     async def do_process():
         stats = {"total": len(json_files), "processed": 0, "success": 0, "errors": 0}
         
+        # Buffers
+        from src.core.bulk_ops import (
+            bulk_upsert_products, 
+            bulk_upsert_sellers, 
+            bulk_upsert_skus, 
+            bulk_insert_price_history
+        )
+        
+        products_buffer = []
+        sellers_buffer = []
+        skus_buffer = []
+        prices_buffer = []
+
+        from src.core.models import Category
+        
         async with get_session() as session:
-            for json_file in json_files:
+            for i, json_file in enumerate(json_files):
                 try:
                     with open(json_file) as f:
                         raw_data = json.load(f)
@@ -195,48 +248,68 @@ def process_raw_files(platform: str, directory: str = None) -> dict:
                     if not parsed:
                         continue
                     
-                    # Upsert seller
+                    # Prepare product dict
+                    p_data = {
+                        "id": parsed.id,
+                        "title": parsed.title,
+                        "title_normalized": parser.normalize_title(parsed.title),
+                        "category_id": parsed.category_id,
+                        "seller_id": parsed.seller_id,
+                        "rating": parsed.rating,
+                        "review_count": parsed.review_count,
+                        "order_count": parsed.order_count,
+                        "is_available": parsed.is_available,
+                        "total_available": parsed.total_available,
+                        "description": parsed.description,
+                        "photos": parsed.photos,
+                        "raw_data": parsed.raw_data,
+                    }
+                    products_buffer.append(p_data)
+                    
+                    # Prepare seller dict
                     if parsed.seller_data:
-                        seller = Seller(
-                            id=parsed.seller_id,
+                        s_data = {
+                            "id": parsed.seller_id,
+                            "title": parsed.seller_title,
+                            **{k: v for k, v in parsed.seller_data.items() 
+                               if k in ['link', 'rating', 'description', 'account_id', 'reviews', 'orders']}
+                        }
+                        if 'reviews' in s_data: s_data['review_count'] = s_data.pop('reviews')
+                        if 'orders' in s_data: s_data['order_count'] = s_data.pop('orders')
+                        sellers_buffer.append(s_data)
+
+                    # Upsert categories (kept individual for now)
+                    for cat_data in (parsed.category_path or []):
+                        cat = Category(
+                            id=cat_data['id'],
                             platform=platform,
-                            title=parsed.seller_title,
-                            link=parsed.seller_data.get('link'),
-                            rating=parsed.seller_data.get('rating'),
-                            review_count=parsed.seller_data.get('reviews', 0),
-                            order_count=parsed.seller_data.get('orders', 0),
-                            description=parsed.seller_data.get('description'),
-                            account_id=parsed.seller_data.get('account_id'),
+                            title=cat_data['title'],
                         )
-                        await session.merge(seller)
-                    
-                    # Upsert product
-                    product = Product(
-                        id=parsed.id,
-                        platform=platform,
-                        title=parsed.title,
-                        title_normalized=parser.normalize_title(parsed.title),
-                        category_id=parsed.category_id,
-                        seller_id=parsed.seller_id,
-                        rating=parsed.rating,
-                        review_count=parsed.review_count,
-                        order_count=parsed.order_count,
-                        is_available=parsed.is_available,
-                        total_available=parsed.total_available,
-                        raw_data=parsed.raw_data,
-                    )
-                    await session.merge(product)
-                    
-                    # Upsert SKUs
+                        await session.merge(cat)
+
+                    # Prepare SKUs and Prices
                     for sku_data in (parsed.skus or []):
-                        sku = SKU(
-                            id=sku_data['id'],
-                            product_id=parsed.id,
-                            full_price=sku_data.get('full_price'),
-                            purchase_price=sku_data.get('purchase_price'),
-                            available_amount=sku_data.get('available_amount', 0),
-                        )
-                        await session.merge(sku)
+                        sku_entry = {
+                            "id": sku_data['id'],
+                            "product_id": parsed.id,
+                            "full_price": sku_data.get('full_price'),
+                            "purchase_price": sku_data.get('purchase_price'),
+                            "discount_percent": sku_data.get('discount_percent'),
+                            "available_amount": sku_data.get('available_amount', 0),
+                            "barcode": sku_data.get('barcode'),
+                            "characteristics": sku_data.get('characteristics'),
+                        }
+                        skus_buffer.append(sku_entry)
+                        
+                        price_entry = {
+                            "sku_id": sku_data['id'],
+                            "product_id": parsed.id,
+                            "full_price": sku_data.get('full_price'),
+                            "purchase_price": sku_data.get('purchase_price'),
+                            "discount_percent": sku_data.get('discount_percent'),
+                            "available_amount": sku_data.get('available_amount', 0),
+                        }
+                        prices_buffer.append(price_entry)
                     
                     stats["success"] += 1
                     
@@ -246,12 +319,34 @@ def process_raw_files(platform: str, directory: str = None) -> dict:
                 
                 stats["processed"] += 1
                 
-                # Commit every 100 records
-                if stats["processed"] % 100 == 0:
+                # Commit every 500 records
+                if len(products_buffer) >= 500:
+                    if sellers_buffer:
+                        await bulk_upsert_sellers(session, sellers_buffer, platform)
+                        sellers_buffer = []
+                    
+                    if products_buffer:
+                        await bulk_upsert_products(session, products_buffer, platform)
+                        products_buffer = []
+                        
+                    if skus_buffer:
+                        await bulk_upsert_skus(session, skus_buffer)
+                        skus_buffer = []
+                        
+                    if prices_buffer:
+                        await bulk_insert_price_history(session, prices_buffer)
+                        prices_buffer = []
+                        
                     await session.commit()
                     logger.info(f"Processed {stats['processed']}/{stats['total']}")
             
-            await session.commit()
+            # Commit remaining
+            if products_buffer:
+                if sellers_buffer: await bulk_upsert_sellers(session, sellers_buffer, platform)
+                await bulk_upsert_products(session, products_buffer, platform)
+                if skus_buffer: await bulk_upsert_skus(session, skus_buffer)
+                if prices_buffer: await bulk_insert_price_history(session, prices_buffer)
+                await session.commit()
         
         return stats
     

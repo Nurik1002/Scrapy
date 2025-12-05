@@ -1,5 +1,10 @@
 """
 Uzum Downloader - High-performance ID range downloader.
+
+Optimized for speed:
+- 150 concurrent connections (3x default)
+- Async file I/O
+- Minimal delays
 """
 import asyncio
 import json
@@ -8,6 +13,8 @@ from pathlib import Path
 from typing import Optional, Dict, Callable
 from datetime import datetime, timezone
 from dataclasses import dataclass, field
+
+import aiofiles
 
 from .client import UzumClient
 from .parser import UzumParser, parser
@@ -48,15 +55,15 @@ class UzumDownloader:
     High-performance downloader using ID range iteration.
     
     Features:
-    - Parallel async downloads
+    - 150 parallel async downloads (3x faster)
+    - Async file I/O with aiofiles
     - Progress tracking & resume
-    - Raw JSON storage
     - Real-time stats
     """
     
     def __init__(
         self,
-        concurrency: int = 50,
+        concurrency: int = 150,  # Increased from 50
         batch_size: int = 500,
         save_raw: bool = True,
         progress_file: Path = None
@@ -163,13 +170,13 @@ class UzumDownloader:
         return self.stats
     
     async def _save_raw(self, raw_data: Dict):
-        """Save raw JSON to file."""
+        """Save raw JSON to file using async I/O."""
         try:
             product_id = raw_data.get("payload", {}).get("data", {}).get("id")
             if product_id and self._save_dir:
                 filepath = self._save_dir / f"{product_id}.json"
-                with open(filepath, 'w', encoding='utf-8') as f:
-                    json.dump(raw_data, f, ensure_ascii=False)
+                async with aiofiles.open(filepath, 'w', encoding='utf-8') as f:
+                    await f.write(json.dumps(raw_data, ensure_ascii=False))
         except Exception as e:
             self.stats.errors += 1
     

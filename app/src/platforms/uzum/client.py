@@ -34,13 +34,17 @@ class UzumClient:
     
     def __init__(
         self,
-        concurrency: int = 50,
-        timeout: int = 10,
-        retries: int = 3
+        concurrency: int = 500,  # Scaled for 16-core server (was 150)
+        timeout: int = 15,
+        retries: int = 3,
+        min_sleep: float = 0.01, # Keep-alive sleep
+        max_sleep: float = 0.1,  # Random jitter
     ):
         self.concurrency = concurrency
         self.timeout = timeout
         self.retries = retries
+        self.min_sleep = min_sleep
+        self.max_sleep = max_sleep
         self._session: Optional[aiohttp.ClientSession] = None
         self._semaphore: Optional[asyncio.Semaphore] = None
     
@@ -52,12 +56,15 @@ class UzumClient:
         await self.close()
     
     async def connect(self):
-        """Initialize connection pool."""
+        """Initialize optimized connection pool for high-throughput."""
         if self._session is None:
             connector = TCPConnector(
                 limit=self.concurrency,
                 limit_per_host=self.concurrency,
                 ttl_dns_cache=300,
+                keepalive_timeout=30,
+                enable_cleanup_closed=True,
+                force_close=False,
             )
             self._session = aiohttp.ClientSession(
                 connector=connector,
@@ -73,19 +80,15 @@ class UzumClient:
             self._session = None
     
     async def fetch_product(self, product_id: int) -> Optional[Dict[str, Any]]:
-        """
-        Fetch a single product by ID.
-        
-        Args:
-            product_id: Product ID
-            
-        Returns:
-            Raw API response or None if not found/error
-        """
+        """Fetch with smart rate limiting."""
         if self._session is None:
             await self.connect()
         
         url = self.PRODUCT_URL.format(product_id=product_id)
+        
+        # Smart sleep to avoid pattern detection
+        import random
+        await asyncio.sleep(random.uniform(self.min_sleep, self.max_sleep))
         
         for attempt in range(self.retries):
             try:
@@ -93,19 +96,26 @@ class UzumClient:
                     async with self._session.get(url) as response:
                         if response.status == 200:
                             data = await response.json()
-                            # Check if product exists
                             payload = data.get("payload", {}).get("data", {})
                             if payload and payload.get("title"):
                                 return data
+                            return None
+                        elif response.status == 429: # Rate limit
+                            wait = (attempt + 1) * 2
+                            logger.warning(f"Rate limited (429). Waiting {wait}s...")
+                            await asyncio.sleep(wait)
+                            continue
+                        elif response.status == 404:
+                            return None
+                            
                         return None
             except asyncio.TimeoutError:
                 if attempt == self.retries - 1:
-                    logger.warning(f"Timeout for product {product_id}")
-                await asyncio.sleep(0.5 * (attempt + 1))
+                    logger.debug(f"Timeout for product {product_id}")
+                await asyncio.sleep(0.5)
             except Exception as e:
-                if attempt == self.retries - 1:
-                    logger.error(f"Error fetching {product_id}: {e}")
-                await asyncio.sleep(0.5 * (attempt + 1))
+                logger.debug(f"Error fetching {product_id}: {e}")
+                await asyncio.sleep(0.5)
         
         return None
     
@@ -166,8 +176,8 @@ class UzumClient:
             
             current_id += batch_size
             
-            # Small delay between batches
-            await asyncio.sleep(0.05)
+            # Minimal delay between batches
+            await asyncio.sleep(0.01)  # 10ms (reduced from 50ms)
 
 
 # Singleton client
