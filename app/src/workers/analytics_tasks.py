@@ -110,7 +110,7 @@ def detect_price_changes(platform: str, threshold_percent: float = 5.0) -> dict:
     async def do_detect():
         async with get_session() as session:
             # Find SKUs with price changes in last hour
-            one_hour_ago = datetime.now(timezone.utc) - timedelta(hours=1)
+            one_hour_ago = datetime.utcnow() - timedelta(hours=1)
             
             query = text("""
                 WITH recent AS (

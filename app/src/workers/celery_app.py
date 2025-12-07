@@ -1,5 +1,5 @@
 """
-Celery Application - Task queue configuration.
+Celery Application - Task queue configuration for NON-STOP scraping.
 """
 from celery import Celery
 from celery.schedules import crontab
@@ -26,10 +26,14 @@ celery_app.conf.update(
     timezone=settings.celery.timezone,
     enable_utc=settings.celery.enable_utc,
     
-    # Task settings
+    # Task settings for long-running tasks
     task_acks_late=True,
     task_reject_on_worker_lost=True,
     worker_prefetch_multiplier=1,
+    
+    # Long timeout for continuous tasks
+    task_soft_time_limit=21600,  # 6 hours
+    task_time_limit=25200,       # 7 hours hard limit
     
     # Result settings
     result_expires=3600,
@@ -40,28 +44,52 @@ celery_app.conf.update(
     },
 )
 
-# Auto-discover tasks
+# Auto-discover tasks (including new continuous_scraper and maintenance_tasks)
 celery_app.autodiscover_tasks([
     'src.workers.download_tasks',
     'src.workers.process_tasks',
     'src.workers.analytics_tasks',
+    'src.workers.continuous_scraper',     # NEW: Continuous scraping
+    'src.workers.maintenance_tasks',       # NEW: Maintenance tasks
 ])
 
-# Beat schedule (periodic tasks)
+# ==============================================================================
+# Beat schedule for NON-STOP 24/7 scraping operation
+# ==============================================================================
 celery_app.conf.beat_schedule = {
-    # Full scan every 6 hours
-    'full-scan-every-6h': {
-        'task': 'src.workers.download_tasks.scan_id_range',
-        'schedule': crontab(hour='*/6', minute=0),
-        'args': ('uzum', 1, 3000000, 100000),  # Platform, start, end, target
+    # ==========================================================================
+    # CONTINUOUS SCRAPING - Self-healing with periodic restart checks
+    # ==========================================================================
+    
+    # Ensure Uzum scraper is running (restart if stale) - every 2 hours
+    'ensure-uzum-running': {
+        'task': 'src.workers.maintenance_tasks.ensure_scrapers_running',
+        'schedule': crontab(minute=0, hour='*/2'),
     },
     
-    # Process raw files every 30 minutes
-    'process-raw-every-30m': {
-        'task': 'src.workers.process_tasks.process_pending',
-        'schedule': crontab(minute='*/30'),
-        'args': ('uzum',),
+    # ==========================================================================
+    # HEALTH MONITORING
+    # ==========================================================================
+    
+    # Health check every hour
+    'hourly-health-check': {
+        'task': 'src.workers.maintenance_tasks.health_check',
+        'schedule': crontab(minute=30),
     },
+    
+    # ==========================================================================
+    # DATABASE MAINTENANCE
+    # ==========================================================================
+    
+    # Daily VACUUM at 4 AM (low activity)
+    'daily-vacuum-4am': {
+        'task': 'src.workers.maintenance_tasks.vacuum_tables',
+        'schedule': crontab(hour=4, minute=0),
+    },
+    
+    # ==========================================================================
+    # ANALYTICS
+    # ==========================================================================
     
     # Daily analytics at 3 AM
     'daily-analytics-3am': {
@@ -70,10 +98,11 @@ celery_app.conf.beat_schedule = {
         'args': ('uzum',),
     },
     
-    # Price change alerts every hour
-    'price-alerts-hourly': {
+    # Price change detection every 6 hours
+    'price-alerts-6h': {
         'task': 'src.workers.analytics_tasks.detect_price_changes',
-        'schedule': crontab(minute=0),
+        'schedule': crontab(hour='*/6', minute=15),
         'args': ('uzum',),
     },
 }
+

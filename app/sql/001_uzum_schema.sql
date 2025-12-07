@@ -25,6 +25,7 @@ DROP TABLE IF EXISTS raw_snapshots CASCADE;
 -- =============================================================================
 CREATE TABLE sellers (
     id BIGINT PRIMARY KEY,
+    platform VARCHAR(50) DEFAULT 'uzum',
     title VARCHAR(500) NOT NULL,
     link VARCHAR(255),                    -- URL slug
     description TEXT,
@@ -48,12 +49,14 @@ CREATE TABLE sellers (
 CREATE INDEX idx_sellers_rating ON sellers(rating DESC);
 CREATE INDEX idx_sellers_orders ON sellers(order_count DESC);
 CREATE INDEX idx_sellers_link ON sellers(link);
+CREATE INDEX idx_sellers_platform ON sellers(platform);
 
 -- =============================================================================
 -- 2. CATEGORIES - Hierarchical category tree
 -- =============================================================================
 CREATE TABLE categories (
     id BIGINT PRIMARY KEY,
+    platform VARCHAR(50) DEFAULT 'uzum',
     title VARCHAR(500) NOT NULL,
     title_ru VARCHAR(500),                -- Russian translation
     title_uz VARCHAR(500),                -- Uzbek translation
@@ -72,13 +75,16 @@ CREATE TABLE categories (
 CREATE INDEX idx_categories_parent ON categories(parent_id);
 CREATE INDEX idx_categories_level ON categories(level);
 CREATE INDEX idx_categories_path ON categories USING GIN(path_ids);
+CREATE INDEX idx_categories_platform ON categories(platform);
 
 -- =============================================================================
 -- 3. PRODUCTS - Core product information
 -- =============================================================================
 CREATE TABLE products (
     id BIGINT PRIMARY KEY,
+    platform VARCHAR(50) DEFAULT 'uzum',
     title VARCHAR(1000) NOT NULL,
+    title_normalized VARCHAR(1000),
     title_ru VARCHAR(1000),
     title_uz VARCHAR(1000),
     
@@ -129,6 +135,7 @@ CREATE INDEX idx_products_category ON products(category_id);
 CREATE INDEX idx_products_rating ON products(rating DESC);
 CREATE INDEX idx_products_available ON products(is_available, total_available DESC);
 CREATE INDEX idx_products_title ON products USING GIN(to_tsvector('russian', title));
+CREATE INDEX idx_products_platform ON products(platform);
 
 -- =============================================================================
 -- 4. SKUS - Product variants with pricing

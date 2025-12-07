@@ -63,6 +63,27 @@ def scan_id_range(
             
             return run_async(do_download())
         
+        elif platform == "uzex":
+            from src.platforms.uzex import UzexDownloader
+            
+            async def do_download():
+                downloader = UzexDownloader(batch_size=100)
+                stats = await downloader.download_lots(
+                    lot_type="auction",
+                    status="completed",
+                    target=target,
+                    start_from=start_id,
+                    resume=True,
+                    skip_existing=True
+                )
+                return {
+                    "processed": stats.processed,
+                    "found": stats.found,
+                    "rate": stats.rate,
+                }
+            
+            return run_async(do_download())
+        
         else:
             raise ValueError(f"Unknown platform: {platform}")
             
@@ -111,6 +132,31 @@ def download_product(
             
             return run_async(do_fetch())
         
+        elif platform == "uzex":
+            # For Uzex, product_id is lot_id
+            from src.platforms.uzex import UzexClient, parser
+            
+            async def do_fetch():
+                client = UzexClient()
+                await client.connect()
+                try:
+                    # Fetch completed auction lot
+                    data = await client.get_completed_auctions(product_id, product_id)
+                    if data:
+                        lot = parser.parse_lot(data[0], "auction", "completed")
+                        if lot:
+                            return {
+                                "id": lot.id,
+                                "title": lot.title,
+                                "price": lot.price,
+                                "status": lot.status,
+                            }
+                finally:
+                    await client.close()
+                return None
+            
+            return run_async(do_fetch())
+        
         raise ValueError(f"Unknown platform: {platform}")
         
     except Exception as e:
@@ -140,6 +186,29 @@ def download_batch(platform: str, product_ids: list) -> dict:
             await client.connect()
             try:
                 results = await client.fetch_batch(product_ids)
+                return {
+                    "requested": len(product_ids),
+                    "found": len(results),
+                }
+            finally:
+                await client.close()
+        
+        return run_async(do_batch())
+    
+    elif platform == "uzex":
+        # For Uzex, batch download lots
+        from src.platforms.uzex import UzexClient, parser
+        
+        async def do_batch():
+            client = UzexClient()
+            await client.connect()
+            try:
+                results = []
+                # Fetch lots individually (no batch API available)
+                for lot_id in product_ids:
+                    data = await client.get_completed_auctions(lot_id, lot_id)
+                    if data:
+                        results.append(data[0])
                 return {
                     "requested": len(product_ids),
                     "found": len(results),

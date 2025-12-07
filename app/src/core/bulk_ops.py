@@ -5,13 +5,63 @@ import logging
 from typing import List, Dict, Any, Type
 from datetime import datetime, timezone
 
+
 from sqlalchemy import text
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from .models import Product, Seller, Category, SKU, PriceHistory, UzexLot, UzexLotItem
+from .models import Product, Seller, Category, SKU, PriceHistory
+# UzexLot and UzexLotItem should be imported from src.platforms.uzex.models when needed
 
 logger = logging.getLogger(__name__)
+
+
+async def bulk_upsert_categories(
+    session: AsyncSession,
+    categories: List[Dict[str, Any]],
+    platform: str = "uzum"
+) -> int:
+    """
+    Bulk upsert categories - MUST be called BEFORE products to avoid FK violations.
+    
+    Args:
+        session: Database session
+        categories: List of category dicts with 'id' and 'title'
+        platform: Platform name
+        
+    Returns:
+        Number of rows affected
+    """
+    if not categories:
+        return 0
+    
+    # Deduplicate by ID (keep last occurrence)
+    seen_ids = {}
+    for c in categories:
+        seen_ids[c["id"]] = c
+    categories = list(seen_ids.values())
+    
+    logger.info(f"Bulk upserting {len(categories)} categories for {platform}")
+    
+    # Simple upsert using ON CONFLICT - minimal fields to avoid errors
+    values = []
+    for c in categories:
+        values.append({
+            "id": c["id"],
+            "platform": platform,
+            "title": c.get("title") or "Unknown",
+        })
+    
+    stmt = insert(Category).values(values)
+    stmt = stmt.on_conflict_do_update(
+        index_elements=["id"],
+        set_={
+            "title": stmt.excluded.title,
+        }
+    )
+    
+    result = await session.execute(stmt)
+    return result.rowcount
 
 
 async def bulk_upsert_products(
@@ -35,6 +85,12 @@ async def bulk_upsert_products(
     if not products:
         return 0
     
+    # Deduplicate by ID (keep last occurrence to avoid CardinalityViolationError)
+    seen_ids = {}
+    for p in products:
+        seen_ids[p["id"]] = p
+    products = list(seen_ids.values())
+    
     # Prepare data
     values = []
     for p in products:
@@ -53,7 +109,7 @@ async def bulk_upsert_products(
             "description": p.get("description"),
             "photos": p.get("photos"),
             "raw_data": p.get("raw_data"),
-            "updated_at": datetime.now(timezone.utc),
+            "last_seen_at": datetime.now(timezone.utc),
         })
     
     stmt = insert(Product).values(values)
@@ -68,7 +124,7 @@ async def bulk_upsert_products(
             "is_available": stmt.excluded.is_available,
             "total_available": stmt.excluded.total_available,
             "raw_data": stmt.excluded.raw_data,
-            "updated_at": stmt.excluded.updated_at,
+            "last_seen_at": stmt.excluded.last_seen_at,
         }
     )
     
@@ -85,6 +141,16 @@ async def bulk_upsert_sellers(
     if not sellers:
         return 0
     
+    # Deduplicate by ID (keep last occurrence)
+    seen_ids = {}
+    for s in sellers:
+        seen_ids[s["id"]] = s
+    sellers = list(seen_ids.values())
+    
+    # Debug logging
+    original_count = len([s for s in sellers])  # This line will be after dedup
+    logger.info(f"Deduplicating sellers: received batch, after dedup have {len(sellers)} unique sellers")
+    
     values = []
     for s in sellers:
         values.append({
@@ -96,7 +162,7 @@ async def bulk_upsert_sellers(
             "review_count": s.get("review_count", 0),
             "order_count": s.get("order_count", 0),
             "account_id": s.get("account_id"),
-            "updated_at": datetime.now(timezone.utc),
+            "last_seen_at": datetime.now(timezone.utc),
         })
     
     stmt = insert(Seller).values(values)
@@ -107,7 +173,7 @@ async def bulk_upsert_sellers(
             "rating": stmt.excluded.rating,
             "review_count": stmt.excluded.review_count,
             "order_count": stmt.excluded.order_count,
-            "updated_at": stmt.excluded.updated_at,
+            "last_seen_at": stmt.excluded.last_seen_at,
         }
     )
     
@@ -123,8 +189,19 @@ async def bulk_upsert_skus(
     if not skus:
         return 0
     
+    # Deduplicate by ID (keep last occurrence)
+    seen_ids = {}
+    for s in skus:
+        seen_ids[s["id"]] = s
+    skus = list(seen_ids.values())
+    
     values = []
     for s in skus:
+        # Convert barcode to string if it's an integer
+        barcode = s.get("barcode")
+        if barcode is not None and not isinstance(barcode, str):
+            barcode = str(barcode)
+        
         values.append({
             "id": s["id"],
             "product_id": s["product_id"],
@@ -132,9 +209,9 @@ async def bulk_upsert_skus(
             "purchase_price": s.get("purchase_price"),
             "discount_percent": s.get("discount_percent"),
             "available_amount": s.get("available_amount", 0),
-            "barcode": s.get("barcode"),
+            "barcode": barcode,
             "characteristics": s.get("characteristics"),
-            "updated_at": datetime.now(timezone.utc),
+            "last_seen_at": datetime.now(timezone.utc),
         })
     
     stmt = insert(SKU).values(values)
@@ -145,7 +222,7 @@ async def bulk_upsert_skus(
             "purchase_price": stmt.excluded.purchase_price,
             "discount_percent": stmt.excluded.discount_percent,
             "available_amount": stmt.excluded.available_amount,
-            "updated_at": stmt.excluded.updated_at,
+            "last_seen_at": stmt.excluded.last_seen_at,
         }
     )
     
@@ -184,6 +261,14 @@ async def bulk_upsert_uzex_lots(
     """Bulk upsert UZEX lots."""
     if not lots:
         return 0
+    
+    # Deduplicate by ID (keep last occurrence)
+    seen_ids = {}
+    for lot in lots:
+        seen_ids[lot["id"]] = lot
+    lots = list(seen_ids.values())
+    
+    from src.platforms.uzex.models import UzexLot
     
     values = []
     for lot in lots:
@@ -235,6 +320,8 @@ async def bulk_insert_uzex_items(
     """Bulk insert UZEX lot items."""
     if not items:
         return 0
+    
+    from src.platforms.uzex.models import UzexLotItem
     
     values = []
     for item in items:
