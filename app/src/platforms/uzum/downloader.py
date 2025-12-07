@@ -176,6 +176,8 @@ class UzumDownloader:
                 "platform": "uzum",
                 "title": parsed.title,
                 "title_normalized": parser.normalize_title(parsed.title) if parsed.title else None,
+                "title_ru": parsed.title_ru,
+                "title_uz": parsed.title_uz,
                 "category_id": parsed.category_id,
                 "seller_id": parsed.seller_id,
                 "rating": parsed.rating,
@@ -185,19 +187,40 @@ class UzumDownloader:
                 "total_available": parsed.total_available,
                 "description": parsed.description,
                 "photos": {"urls": photos} if photos else None,
+                "video_url": parsed.video_url,
+                "attributes": parsed.attributes,
+                "characteristics": parsed.characteristics,
+                "tags": parsed.tags,
+                "is_eco": parsed.is_eco,
+                "is_adult": parsed.is_adult,
+                "is_perishable": parsed.is_perishable,
+                "has_warranty": parsed.has_warranty,
+                "warranty_info": parsed.warranty_info,
                 "raw_data": raw_data.get("payload", {}).get("data", {}),
             }
             
             # Seller data (deduplicated by ID)
             if parsed.seller_data and parsed.seller_id:
+                # Convert registration_date if needed
+                reg_date = parsed.seller_data.get("registration_date")
+                if reg_date and isinstance(reg_date, (int, float)):
+                    # Convert Unix timestamp (milliseconds) to datetime
+                    # Use naive datetime (without timezone) for PostgreSQL TIMESTAMP WITHOUT TIME ZONE
+                    from datetime import datetime
+                    reg_date = datetime.utcfromtimestamp(reg_date / 1000)
+
                 self._sellers_buffer[parsed.seller_id] = {
                     "id": parsed.seller_id,
                     "platform": "uzum",
                     "title": parsed.seller_title,
                     "link": parsed.seller_data.get("link"),
+                    "description": parsed.seller_data.get("description"),
                     "rating": parsed.seller_data.get("rating"),
                     "review_count": parsed.seller_data.get("reviews", 0),
                     "order_count": parsed.seller_data.get("orders", 0),
+                    "total_products": parsed.seller_data.get("totalProducts", 0),
+                    "is_official": parsed.seller_data.get("is_official", False),
+                    "registration_date": reg_date,
                     "account_id": parsed.seller_data.get("account_id"),
                 }
             

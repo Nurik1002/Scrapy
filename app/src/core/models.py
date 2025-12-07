@@ -34,10 +34,11 @@ class Seller(Base):
     
     registration_date: Mapped[Optional[datetime]] = mapped_column(DateTime)
     account_id: Mapped[Optional[int]] = mapped_column(BigInteger)
-    
+
     first_seen_at: Mapped[datetime] = mapped_column(DateTime, default=func.now())
     last_seen_at: Mapped[datetime] = mapped_column(DateTime, default=func.now(), onupdate=func.now())
-    
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=func.now(), onupdate=func.now())
+
     raw_data: Mapped[Optional[dict]] = mapped_column(JSONB)
     
     # Relationships
@@ -82,30 +83,42 @@ class Category(Base):
 class Product(Base):
     """Product listing."""
     __tablename__ = "products"
-    
+
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
     platform: Mapped[str] = mapped_column(String(50), default="uzum")
     title: Mapped[str] = mapped_column(String(1000), nullable=False)
     title_normalized: Mapped[Optional[str]] = mapped_column(String(1000))  # For matching
-    
+    title_ru: Mapped[Optional[str]] = mapped_column(String(1000))  # Russian translation
+    title_uz: Mapped[Optional[str]] = mapped_column(String(1000))  # Uzbek translation
+
     category_id: Mapped[Optional[int]] = mapped_column(BigInteger, ForeignKey("categories.id"))
     seller_id: Mapped[Optional[int]] = mapped_column(BigInteger, ForeignKey("sellers.id"))
-    
+
     rating: Mapped[Optional[Decimal]] = mapped_column(Numeric(2, 1))
     review_count: Mapped[int] = mapped_column(Integer, default=0)
     order_count: Mapped[int] = mapped_column(Integer, default=0)
-    
+
     is_available: Mapped[bool] = mapped_column(Boolean, default=True)
     total_available: Mapped[int] = mapped_column(Integer, default=0)
-    
+
     description: Mapped[Optional[str]] = mapped_column(Text)
     photos: Mapped[Optional[dict]] = mapped_column(JSONB)
+    video_url: Mapped[Optional[str]] = mapped_column(Text)  # Video URL
     attributes: Mapped[Optional[dict]] = mapped_column(JSONB)
     characteristics: Mapped[Optional[dict]] = mapped_column(JSONB)
-    
+    tags: Mapped[Optional[List[str]]] = mapped_column(ARRAY(String))  # Search tags
+
+    # Product flags
+    is_eco: Mapped[bool] = mapped_column(Boolean, default=False)
+    is_adult: Mapped[bool] = mapped_column(Boolean, default=False)
+    is_perishable: Mapped[bool] = mapped_column(Boolean, default=False)
+    has_warranty: Mapped[bool] = mapped_column(Boolean, default=False)
+    warranty_info: Mapped[Optional[str]] = mapped_column(Text)
+
     first_seen_at: Mapped[datetime] = mapped_column(DateTime, default=func.now())
     last_seen_at: Mapped[datetime] = mapped_column(DateTime, default=func.now(), onupdate=func.now())
-    
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=func.now(), onupdate=func.now())
+
     raw_data: Mapped[Optional[dict]] = mapped_column(JSONB)
     
     # Relationships
@@ -135,9 +148,10 @@ class SKU(Base):
     available_amount: Mapped[int] = mapped_column(Integer, default=0)
     barcode: Mapped[Optional[str]] = mapped_column(String(100))
     characteristics: Mapped[Optional[dict]] = mapped_column(JSONB)
-    
+
     first_seen_at: Mapped[datetime] = mapped_column(DateTime, default=func.now())
     last_seen_at: Mapped[datetime] = mapped_column(DateTime, default=func.now(), onupdate=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=func.now(), onupdate=func.now())
     
     # Relationships
     product: Mapped["Product"] = relationship(back_populates="skus")
@@ -175,21 +189,50 @@ class PriceHistory(Base):
     )
 
 
+class ProductSeller(Base):
+    """Track same product from multiple sellers for price comparison."""
+    __tablename__ = "product_sellers"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+
+    # Matching criteria
+    product_title_normalized: Mapped[Optional[str]] = mapped_column(String(1000))
+    barcode: Mapped[Optional[str]] = mapped_column(String(100))
+
+    # Product instance
+    product_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("products.id"))
+    seller_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("sellers.id"))
+
+    # Current best price from this seller
+    min_price: Mapped[Optional[int]] = mapped_column(BigInteger)
+    max_price: Mapped[Optional[int]] = mapped_column(BigInteger)
+
+    # Tracking
+    first_seen_at: Mapped[datetime] = mapped_column(DateTime, default=func.now())
+    last_seen_at: Mapped[datetime] = mapped_column(DateTime, default=func.now(), onupdate=func.now())
+
+    __table_args__ = (
+        Index("idx_product_sellers_title", "product_title_normalized"),
+        Index("idx_product_sellers_barcode", "barcode"),
+        Index("idx_product_sellers_price", "min_price"),
+    )
+
+
 class RawSnapshot(Base):
     """Raw API response storage."""
     __tablename__ = "raw_snapshots"
-    
+
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
     platform: Mapped[str] = mapped_column(String(50), default="uzum")
     product_id: Mapped[int] = mapped_column(BigInteger)
-    
+
     raw_json: Mapped[dict] = mapped_column(JSONB, nullable=False)
     file_path: Mapped[Optional[str]] = mapped_column(Text)
-    
+
     fetched_at: Mapped[datetime] = mapped_column(DateTime, default=func.now())
     processed: Mapped[bool] = mapped_column(Boolean, default=False)
     processed_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
-    
+
     __table_args__ = (
         Index("idx_raw_product", "product_id"),
         Index("idx_raw_pending", "processed"),

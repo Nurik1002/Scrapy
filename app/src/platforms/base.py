@@ -14,29 +14,38 @@ class ProductData:
     title: str
     title_ru: Optional[str] = None
     title_uz: Optional[str] = None
-    
+
     category_id: Optional[int] = None
     category_title: Optional[str] = None
     category_path: Optional[List[Dict]] = None
-    
+
     seller_id: Optional[int] = None
     seller_title: Optional[str] = None
     seller_data: Optional[Dict] = None
-    
+
     rating: Optional[float] = None
     review_count: int = 0
     order_count: int = 0
-    
+
     is_available: bool = True
     total_available: int = 0
-    
+
     description: Optional[str] = None
     photos: Optional[List[str]] = None
+    video_url: Optional[str] = None
     attributes: Optional[Dict] = None
     characteristics: Optional[Dict] = None
-    
+    tags: Optional[List[str]] = None
+
+    # Product flags
+    is_eco: bool = False
+    is_adult: bool = False
+    is_perishable: bool = False
+    has_warranty: bool = False
+    warranty_info: Optional[str] = None
+
     skus: List[Dict] = None
-    
+
     raw_data: Optional[Dict] = None
 
 

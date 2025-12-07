@@ -130,16 +130,24 @@ class CheckpointManager:
     async def filter_unseen(self, ids: list) -> list:
         """
         Filter list to only unseen IDs.
+        Uses Redis pipeline for atomic bulk checking.
         """
         if not ids or not self._redis:
             return ids
-        
-        # Check each ID
-        unseen = []
+
+        # Use pipeline for atomic bulk check (much faster, reduces race condition)
+        seen_key = f"{self.SEEN_PREFIX}{self.key}"
+        pipe = self._redis.pipeline()
+
         for id_ in ids:
-            if not await self._redis.sismember(f"{self.SEEN_PREFIX}{self.key}", str(id_)):
-                unseen.append(id_)
-        
+            pipe.sismember(seen_key, str(id_))
+
+        # Execute all checks atomically
+        results = await pipe.execute()
+
+        # Filter to unseen only
+        unseen = [ids[i] for i, is_seen in enumerate(results) if not is_seen]
+
         return unseen
     
     async def is_seen(self, id_: Any) -> bool:
@@ -165,17 +173,37 @@ class CheckpointManager:
     # =========================================================================
     
     def _save_to_file(self, data: Dict):
-        """Save checkpoint to file."""
+        """
+        Save checkpoint to file with file locking to prevent corruption.
+        """
+        import fcntl
+
         self._local_checkpoint_file.parent.mkdir(parents=True, exist_ok=True)
+
+        # Use exclusive lock to prevent concurrent writes
         with open(self._local_checkpoint_file, 'w') as f:
-            json.dump(data, f, indent=2)
-    
+            fcntl.flock(f.fileno(), fcntl.LOCK_EX)
+            try:
+                json.dump(data, f, indent=2)
+            finally:
+                fcntl.flock(f.fileno(), fcntl.LOCK_UN)
+
     def _load_from_file(self) -> Optional[Dict]:
-        """Load checkpoint from file."""
-        if self._local_checkpoint_file.exists():
-            with open(self._local_checkpoint_file) as f:
+        """
+        Load checkpoint from file with shared lock.
+        """
+        import fcntl
+
+        if not self._local_checkpoint_file.exists():
+            return None
+
+        # Use shared lock for reading
+        with open(self._local_checkpoint_file) as f:
+            fcntl.flock(f.fileno(), fcntl.LOCK_SH)
+            try:
                 return json.load(f)
-        return None
+            finally:
+                fcntl.flock(f.fileno(), fcntl.LOCK_UN)
 
 
 async def get_checkpoint_manager(platform: str, job_type: str) -> CheckpointManager:

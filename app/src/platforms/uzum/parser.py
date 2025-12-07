@@ -103,36 +103,69 @@ class UzumParser:
             loc_title = data.get("localizableTitle", {})
             title_ru = loc_title.get("ru") if isinstance(loc_title, dict) else None
             title_uz = loc_title.get("uz") if isinstance(loc_title, dict) else None
-            
+
             # Calculate total availability
             total_available = sum(sku.get("available_amount", 0) for sku in skus)
-            
+
+            # Extract video URL
+            video = data.get("video")
+            video_url = None
+            if video and isinstance(video, dict):
+                video_url = video.get("url")
+            elif isinstance(video, str):
+                video_url = video
+
+            # Extract tags
+            tags = data.get("tags")
+            if isinstance(tags, list):
+                tags = [str(t) for t in tags if t]  # Convert to strings
+            else:
+                tags = None
+
+            # Extract warranty info
+            warranty = data.get("warranty")
+            has_warranty = bool(warranty)
+            warranty_info = None
+            if warranty and isinstance(warranty, dict):
+                warranty_info = warranty.get("title") or warranty.get("description")
+            elif isinstance(warranty, str):
+                warranty_info = warranty
+
             return ProductData(
                 id=data["id"],
                 title=data["title"],
                 title_ru=title_ru,
                 title_uz=title_uz,
-                
+
                 category_id=category_id,
                 category_title=category_title,
                 category_path=category_path,
-                
+
                 seller_id=seller.get("id") if seller else None,
                 seller_title=seller.get("title") if seller else None,
                 seller_data=seller_data,
-                
+
                 rating=data.get("rating"),
                 review_count=data.get("reviewsAmount", 0),
                 order_count=data.get("ordersAmount", 0),
-                
+
                 is_available=total_available > 0,
                 total_available=total_available,
-                
+
                 description=data.get("description"),
                 photos=photos if photos else None,
+                video_url=video_url,
                 attributes=data.get("attributes"),
                 characteristics=data.get("characteristics"),
-                
+                tags=tags,
+
+                # Product flags
+                is_eco=data.get("isEco", False),
+                is_adult=data.get("adultCategory", False),
+                is_perishable=data.get("isPerishable", False),
+                has_warranty=has_warranty,
+                warranty_info=warranty_info,
+
                 skus=skus,
                 raw_data=raw_data,
             )

@@ -99,6 +99,8 @@ async def bulk_upsert_products(
             "platform": platform,
             "title": p.get("title"),
             "title_normalized": p.get("title_normalized"),
+            "title_ru": p.get("title_ru"),
+            "title_uz": p.get("title_uz"),
             "category_id": p.get("category_id"),
             "seller_id": p.get("seller_id"),
             "rating": p.get("rating"),
@@ -108,8 +110,18 @@ async def bulk_upsert_products(
             "total_available": p.get("total_available", 0),
             "description": p.get("description"),
             "photos": p.get("photos"),
+            "video_url": p.get("video_url"),
+            "attributes": p.get("attributes"),
+            "characteristics": p.get("characteristics"),
+            "tags": p.get("tags"),
+            "is_eco": p.get("is_eco", False),
+            "is_adult": p.get("is_adult", False),
+            "is_perishable": p.get("is_perishable", False),
+            "has_warranty": p.get("has_warranty", False),
+            "warranty_info": p.get("warranty_info"),
             "raw_data": p.get("raw_data"),
             "last_seen_at": datetime.utcnow(),
+            "updated_at": datetime.utcnow(),
         })
     
     stmt = insert(Product).values(values)
@@ -118,13 +130,27 @@ async def bulk_upsert_products(
         set_={
             "title": stmt.excluded.title,
             "title_normalized": stmt.excluded.title_normalized,
+            "title_ru": stmt.excluded.title_ru,
+            "title_uz": stmt.excluded.title_uz,
             "rating": stmt.excluded.rating,
             "review_count": stmt.excluded.review_count,
             "order_count": stmt.excluded.order_count,
             "is_available": stmt.excluded.is_available,
             "total_available": stmt.excluded.total_available,
+            "description": stmt.excluded.description,
+            "photos": stmt.excluded.photos,
+            "video_url": stmt.excluded.video_url,
+            "attributes": stmt.excluded.attributes,
+            "characteristics": stmt.excluded.characteristics,
+            "tags": stmt.excluded.tags,
+            "is_eco": stmt.excluded.is_eco,
+            "is_adult": stmt.excluded.is_adult,
+            "is_perishable": stmt.excluded.is_perishable,
+            "has_warranty": stmt.excluded.has_warranty,
+            "warranty_info": stmt.excluded.warranty_info,
             "raw_data": stmt.excluded.raw_data,
             "last_seen_at": stmt.excluded.last_seen_at,
+            "updated_at": stmt.excluded.updated_at,
         }
     )
     
@@ -158,11 +184,16 @@ async def bulk_upsert_sellers(
             "platform": platform,
             "title": s.get("title"),
             "link": s.get("link"),
+            "description": s.get("description"),
             "rating": s.get("rating"),
             "review_count": s.get("review_count", 0),
             "order_count": s.get("order_count", 0),
+            "total_products": s.get("total_products", 0),
+            "is_official": s.get("is_official", False),
+            "registration_date": s.get("registration_date"),
             "account_id": s.get("account_id"),
             "last_seen_at": datetime.utcnow(),
+            "updated_at": datetime.utcnow(),
         })
     
     stmt = insert(Seller).values(values)
@@ -170,10 +201,15 @@ async def bulk_upsert_sellers(
         index_elements=["id"],
         set_={
             "title": stmt.excluded.title,
+            "description": stmt.excluded.description,
             "rating": stmt.excluded.rating,
             "review_count": stmt.excluded.review_count,
             "order_count": stmt.excluded.order_count,
+            "total_products": stmt.excluded.total_products,
+            "is_official": stmt.excluded.is_official,
+            "registration_date": stmt.excluded.registration_date,
             "last_seen_at": stmt.excluded.last_seen_at,
+            "updated_at": stmt.excluded.updated_at,
         }
     )
     
@@ -212,6 +248,7 @@ async def bulk_upsert_skus(
             "barcode": barcode,
             "characteristics": s.get("characteristics"),
             "last_seen_at": datetime.utcnow(),
+            "updated_at": datetime.utcnow(),
         })
     
     stmt = insert(SKU).values(values)
@@ -223,6 +260,7 @@ async def bulk_upsert_skus(
             "discount_percent": stmt.excluded.discount_percent,
             "available_amount": stmt.excluded.available_amount,
             "last_seen_at": stmt.excluded.last_seen_at,
+            "updated_at": stmt.excluded.updated_at,
         }
     )
     

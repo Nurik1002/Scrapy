@@ -8,7 +8,7 @@ Features:
 """
 import asyncio
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 from celery import shared_task
 
@@ -185,9 +185,7 @@ def cleanup_old_price_history(days_to_keep: int = 90) -> dict:
                 "after_count": before_count - deleted,
                 "cutoff_date": cutoff_date.isoformat(),
             }
-    
-    from datetime import timedelta
-    
+
     result = run_async(do_cleanup())
     logger.info(f"🗑️ Cleanup: Deleted {result['deleted']:,} old price history records")
     return result

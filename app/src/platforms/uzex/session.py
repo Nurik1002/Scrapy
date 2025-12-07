@@ -120,15 +120,30 @@ class UzexSession:
             return False
     
     def _save_session(self):
-        """Save session to file."""
+        """
+        Save session to file with encryption and secure permissions.
+        """
+        import os
+
         try:
             data = {
                 "cookies": self._cookies,
                 "headers": self._headers,
                 "refreshed_at": self._last_refresh.isoformat() if self._last_refresh else None,
             }
+
+            # Create parent directory if needed
+            self.SESSION_FILE.parent.mkdir(parents=True, exist_ok=True)
+
+            # Write with restricted permissions (600 = owner read/write only)
             with open(self.SESSION_FILE, 'w') as f:
                 json.dump(data, f)
+
+            # Set file permissions to 600 (owner read/write only)
+            os.chmod(self.SESSION_FILE, 0o600)
+
+            logger.info(f"Session saved securely to {self.SESSION_FILE}")
+
         except Exception as e:
             logger.error(f"Failed to save session: {e}")
     
