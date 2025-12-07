@@ -1,6 +1,7 @@
 """
 Database module - Async PostgreSQL connection and session management.
 """
+import logging
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 
@@ -10,11 +11,13 @@ from sqlalchemy.pool import NullPool
 
 from .config import settings
 
+# Suppress verbose SQLAlchemy SQL logs
+logging.getLogger('sqlalchemy.engine').setLevel(logging.WARNING)
 
-# Create async engine
+# Create async engine (echo=False to disable SQL logging)
 engine = create_async_engine(
     settings.database.async_url,
-    echo=settings.debug,
+    echo=False,  # Disabled - was too verbose
     poolclass=NullPool,  # Use NullPool for Celery workers
 )
 

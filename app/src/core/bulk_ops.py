@@ -109,7 +109,7 @@ async def bulk_upsert_products(
             "description": p.get("description"),
             "photos": p.get("photos"),
             "raw_data": p.get("raw_data"),
-            "last_seen_at": datetime.now(timezone.utc),
+            "last_seen_at": datetime.utcnow(),
         })
     
     stmt = insert(Product).values(values)
@@ -162,7 +162,7 @@ async def bulk_upsert_sellers(
             "review_count": s.get("review_count", 0),
             "order_count": s.get("order_count", 0),
             "account_id": s.get("account_id"),
-            "last_seen_at": datetime.now(timezone.utc),
+            "last_seen_at": datetime.utcnow(),
         })
     
     stmt = insert(Seller).values(values)
@@ -211,7 +211,7 @@ async def bulk_upsert_skus(
             "available_amount": s.get("available_amount", 0),
             "barcode": barcode,
             "characteristics": s.get("characteristics"),
-            "last_seen_at": datetime.now(timezone.utc),
+            "last_seen_at": datetime.utcnow(),
         })
     
     stmt = insert(SKU).values(values)
@@ -294,7 +294,7 @@ async def bulk_upsert_uzex_lots(
             "lot_end_date": lot.get("lot_end_date"),
             "kazna_status": lot.get("kazna_status"),
             "raw_data": lot.get("raw_data"),
-            "updated_at": datetime.now(timezone.utc),
+            "updated_at": datetime.utcnow(),
         })
     
     stmt = insert(UzexLot).values(values)

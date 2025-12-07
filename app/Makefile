@@ -2,7 +2,7 @@
 # ==========================================
 
 .PHONY: help up down restart logs db-shell api worker beat flower \
-        migrate dump restore uzum-download uzex-download test clean
+        migrate dump restore counts uzum-download uzex-download test clean
 
 # Default target
 help:
@@ -20,6 +20,7 @@ help:
 	@echo "  make migrate     - Apply SQL migrations"
 	@echo "  make dump        - Backup database"
 	@echo "  make restore     - Restore database"
+	@echo "  make counts      - Show table row counts"
 	@echo ""
 	@echo "Services:"
 	@echo "  make api         - Start FastAPI only"
@@ -78,6 +79,10 @@ dump:
 restore:
 	@chmod +x scripts/restore_db.sh
 	@./scripts/restore_db.sh $(FILE)
+
+counts:
+	@chmod +x scripts/table_counts.sh
+	@./scripts/table_counts.sh
 
 # =============================================================================
 # Services
