@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(chmod:*)",
+      "Bash(make:*)",
+      "Bash(docker exec:*)",
+      "Bash(docker-compose down:*)",
+      "Bash(docker-compose up:*)",
+      "Bash(docker-compose ps:*)",
+      "Bash(docker-compose logs:*)",
+      "Bash(docker-compose restart:*)",
+      "Bash(docker-compose stop:*)",
+      "Bash(docker-compose rm:*)",
+      "Bash(docker-compose build:*)",
+      "Bash(timeout 20 docker-compose logs:*)",
+      "Bash(python3:*)",
+      "Bash(docker-compose exec:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
