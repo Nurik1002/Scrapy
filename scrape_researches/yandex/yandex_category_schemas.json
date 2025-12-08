@@ -1,0 +1,140 @@
+{
+    "electronics": {
+        "subtype": "smartphones",
+        "required_attributes": [
+            "Brend",
+            "Model",
+            "Ichki xotira",
+            "Operativ xotira",
+            "Rangi"
+        ],
+        "optional_attributes": [
+            "Sim-kartalar soni",
+            "Batareya quvvati",
+            "Ekran diagonali",
+            "Market maqolasi"
+        ],
+        "variant_logic": "color_storage_split",
+        "native_keys_map": {
+            "articul": "Market maqolasi",
+            "brand": "Brend",
+            "model": "Model",
+            "storage": "Ichki xotira",
+            "ram": "Operativ xotira",
+            "color": "Rangi",
+            "screen_size": "Ekran diagonali",
+            "battery": "Batareya quvvati"
+        }
+    },
+    "computers": {
+        "subtype": "laptops",
+        "required_attributes": [
+            "Brend",
+            "Hukmdor",
+            "Protsessor liniyasi",
+            "Operativ xotira",
+            "Ssd disklarining umumiy hajmi",
+            "Video karta"
+        ],
+        "optional_attributes": [
+            "Ekran diagonali",
+            "Ekranni yangilash tezligi",
+            "Ekran matritsasi turi",
+            "Og'irligi",
+            "Market maqolasi",
+            "Ekran o'lchamlari"
+        ],
+        "variant_logic": "configuration_split",
+        "native_keys_map": {
+            "articul": "Market maqolasi",
+            "brand": "Brend",
+            "line": "Hukmdor",
+            "cpu": "Protsessor liniyasi",
+            "ram": "Operativ xotira",
+            "ssd": "Ssd disklarining umumiy hajmi",
+            "gpu": "Video karta",
+            "screen_size": "Ekran diagonali",
+            "resolution": "Ekran o'lchamlari",
+            "refresh_rate": "Ekranni yangilash tezligi",
+            "panel_type": "Ekran matritsasi turi"
+        }
+    },
+    "appliances": {
+        "subtype": "refrigerators",
+        "required_attributes": [
+            "Brend",
+            "Umumiy hajmi",
+            "Sovutish tizimi",
+            "Kompressor turi"
+        ],
+        "optional_attributes": [
+            "Balandligi",
+            "Kengligi",
+            "Chuqurligi",
+            "Energiya samaradorligi sinfi",
+            "Market maqolasi"
+        ],
+        "variant_logic": "color_split",
+        "native_keys_map": {
+            "articul": "Market maqolasi",
+            "brand": "Brend",
+            "total_volume": "Umumiy hajmi",
+            "cooling_system": "Sovutish tizimi",
+            "compressor": "Kompressor turi",
+            "height": "Balandligi",
+            "width": "Kengligi",
+            "depth": "Chuqurligi",
+            "energy_class": "Energiya samaradorligi sinfi"
+        }
+    },
+    "tools": {
+        "subtype": "drills",
+        "required_attributes": [
+            "Brend",
+            "Turi",
+            "Maksimal aylanish tezligi",
+            "Batareya kuchlanishi"
+        ],
+        "optional_attributes": [
+            "Maksimal moment",
+            "Batareya turi",
+            "Og'irligi",
+            "Patronga diametri",
+            "Market maqolasi"
+        ],
+        "variant_logic": "kit_split",
+        "native_keys_map": {
+            "articul": "Market maqolasi",
+            "brand": "Brend",
+            "type": "Turi",
+            "rpm": "Maksimal aylanish tezligi",
+            "voltage": "Batareya kuchlanishi",
+            "torque": "Maksimal moment",
+            "battery_type": "Batareya turi",
+            "weight": "Og'irligi",
+            "chuck_diameter": "Patronga diametri"
+        }
+    },
+    "clothing": {
+        "subtype": "tshirts",
+        "required_attributes": [
+            "Brend",
+            "Rangi",
+            "O'lcham",
+            "Material"
+        ],
+        "optional_attributes": [
+            "Ishlab chiqaruvchi mamlakat",
+            "Fasl",
+            "Market maqolasi"
+        ],
+        "variant_logic": "size_color_aggregates",
+        "native_keys_map": {
+            "articul": "Market maqolasi",
+            "brand": "Brend",
+            "color": "Rangi",
+            "size": "O'lcham",
+            "material": "Material"
+        }
+    }
+}

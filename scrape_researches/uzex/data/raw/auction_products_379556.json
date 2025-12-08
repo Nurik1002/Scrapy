@@ -1,0 +1,22 @@
+[
+  {
+    "order_num": 1,
+    "product_name": null,
+    "quantity": 96.0,
+    "price": 31490.0,
+    "country_name": "O'zbekiston",
+    "description": "Cho'tka-supurgi  (Xokandoz  bilan birga). O'z ichiga oladi:  cho'tka  va xokandoz., Tutqich  va xokandoz  materiali:  zarbaga  chidamli plastik., tuklаr  materiali;  kаuсhuk, Afzalliklari:  cho'tkasi  chiqindini  to'liq  yig'ish uсhun  45 graduslik kesimga  ega,  kauchuk  xokandoz  qirrasi  polga mahkam о'rnаshgаn  va tutqich uzun. Cho'tka  tutqichi  uzunligi:  kamida - 95 sm., Cho'tka  zichligi:  yuqori., Cho'tka  kengligi:  kamida 25 sm, Xokandoz  tutqichi  uzunligi:  kamida  83 sm., Xokandoz  eni: kamida 25-30 sm., Xokandozning  maxsus  elementi old chetida  yumshoq  rezina, lenta (changni to'liq  yig'adi)., Qo'shimcha  imkoniyatlar  - supurgi xokandozga  ilinishi mumkin,  vertikal  holatda  turadi., Gigiyena  va xavfsizlik  antibakterial  materiallardan tаууогlаngаn, yuvilishi oson. 2025-yil 6-oktabrdagi 055/038-196-1 sonli texnik shart shartnomaning ajralmas qismi hisoblanib, mahsulotlar ushbu texnik shartda keltirilgan talablar bo’yicha qabul qilinadi. ",
+    "cost": 3023040.0,
+    "currency_name": "Сом",
+    "js_properties": [
+      {
+        "property_name": "Единица измерения",
+        "user_value": "компл.",
+        "user_value_id": 1,
+        "pnum": 0
+      }
+    ],
+    "rn": 1,
+    "amount": 96.0
+  }
+]

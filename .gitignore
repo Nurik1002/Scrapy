@@ -7,7 +7,7 @@ __pycache__/
 *.so
 
 
-*.json
+
 
 # Distribution / packaging
 .Python
@@ -208,3 +208,6 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# App storage
+app/storage/raw/

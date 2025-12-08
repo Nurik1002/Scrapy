@@ -1,0 +1,94 @@
+[
+    {
+        "product_id": "yandex_model_1779261899",
+        "source": "market.yandex.uz",
+        "scraped_at": "2025-12-08T16:30:00Z",
+        "category": "tools_drills",
+        "listing_type": "model",
+        "core_data": {
+            "title": "Akumulyatorli matkap-buragich Makita DF333DWYE",
+            "description": "12V, 30Nm, 2 speeds, LED light, 2 batteries included...",
+            "price_min": 1200000,
+            "price_max": 1800000,
+            "currency": "UZS",
+            "rating": 4.9,
+            "review_count": 45,
+            "images": [
+                "https://avatars.mds.yandex.net/get-mpic/5235334/img_id7683416439167389658.jpeg/orig"
+            ]
+        },
+        "raw_attributes": {
+            "Brend": "Makita",
+            "Turi": "matkap-tornavida",
+            "Maksimal aylanish tezligi": "1700 rpm",
+            "Batareya kuchlanishi": "12 V",
+            "Maksimal moment": "30 N*m",
+            "Batareya turi": "Li-Ion",
+            "Og'irligi": "1.1 kg",
+            "Patronga diametri": "0.8 - 10 mm",
+            "Market maqolasi": "1779261899"
+        },
+        "attributes": {
+            "articul": "1779261899",
+            "brand": "Makita",
+            "type": "screw_driver_drill",
+            "rpm": 1700,
+            "voltage": 12,
+            "torque": 30,
+            "battery_type": "Li-Ion",
+            "weight_kg": 1.1,
+            "chuck_diameter_mm": "0.8-10"
+        }
+    },
+    {
+        "product_id": "yandex_model_m2_air",
+        "source": "market.yandex.uz",
+        "scraped_at": "2025-12-08T16:35:00Z",
+        "category": "computers_laptops",
+        "listing_type": "model",
+        "core_data": {
+            "title": "Noutbuk Apple MacBook Air 13.6\" 2022 (M2, 8GB, 256GB SSD)",
+            "description": "Apple M2 chip, 13.6 Liquid Retina, 8GB RAM, 256GB SSD...",
+            "price_min": 12500000,
+            "price_max": 14000000,
+            "currency": "UZS",
+            "rating": 4.8,
+            "review_count": 1200,
+            "images": [
+                "https://avatars.mds.yandex.net/get-mpic/12529549/macbook_air_m2.jpg/orig"
+            ]
+        },
+        "raw_attributes": {
+            "Market maqolasi": "4699796451",
+            "Brend": "Apple",
+            "Hukmdor": "Macbook Air",
+            "Protsessor liniyasi": "Apple M2",
+            "Operativ xotira": "16 GB",
+            "Ssd disklarining umumiy hajmi": "256 GB",
+            "Video karta": "Apple graphics 8-core",
+            "Ekran diagonali": "13.3\"",
+            "Ekran o'lchamlari": "2560x1600"
+        },
+        "attributes": {
+            "articul": "4699796451",
+            "brand": "Apple",
+            "line": "MacBook Air",
+            "cpu": "Apple M2",
+            "ram_gb": 16,
+            "ssd_gb": 256,
+            "gpu": "Apple graphics 8-core",
+            "screen_size_inch": 13.3,
+            "resolution": "2560x1600"
+        },
+        "offers": [
+            {
+                "offer_id": "offer_mac_1",
+                "seller_id": "shop_sezam_deluxe",
+                "price": 12500000,
+                "currency": "UZS",
+                "delivery": "Courier",
+                "available": true
+            }
+        ]
+    }
+]

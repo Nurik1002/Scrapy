@@ -1,0 +1,221 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "OLX.uz Product Schemas",
+    "description": "Data structures and attribute definitions for major OLX.uz categories",
+    "common_attributes": {
+        "id": "string",
+        "title": "string",
+        "price": "string",
+        "currency": "string",
+        "description": "string",
+        "date_posted": "string",
+        "location": "string",
+        "url": "string",
+        "seller_type": "string (e.g., 'Private person', 'Business')",
+        "images": "array<string>"
+    },
+    "category_schemas": {
+        "transport": {
+            "legkovye-avtomobili": {
+                "attributes": {
+                    "offer_type": "string (Частное лицо / Бизнес)",
+                    "brand": "string (Марка)",
+                    "model": "string (Модель)",
+                    "year": "integer (Год выпуска)",
+                    "mileage": "integer (Пробег)",
+                    "body_type": "string (Тип кузова)",
+                    "color": "string (Цвет)",
+                    "engine_type": "string (Тип двигателя)",
+                    "transmission": "string (Коробка передач)",
+                    "condition": "string (Состояние)",
+                    "customs_cleared": "boolean (Растаможен)"
+                }
+            },
+            "gruzovye-avtomobili": {
+                "attributes": {
+                    "offer_type": "string",
+                    "brand": "string (Марка)",
+                    "model": "string",
+                    "year": "integer (Год выпуска)",
+                    "mileage": "integer",
+                    "condition": "string",
+                    "load_capacity": "string (Грузоподъемность)",
+                    "fuel_type": "string (Тип топлива)"
+                }
+            },
+            "mototehnika": {
+                "attributes": {
+                    "offer_type": "string",
+                    "type": "string (Тип)",
+                    "brand": "string",
+                    "year": "integer",
+                    "mileage": "integer",
+                    "engine_volume": "string (Объем двигателя)"
+                }
+            },
+            "spec-tehnika": {
+                "attributes": {
+                    "offer_type": "string",
+                    "type": "string (Вид техники)",
+                    "brand": "string",
+                    "year": "integer",
+                    "condition": "string",
+                    "hours_of_use": "integer (Моточасы)"
+                }
+            }
+        },
+        "nedvizhimost": {
+            "kvartiry": {
+                "attributes": {
+                    "offer_type": "string (Частное лицо / Бизнес)",
+                    "rooms": "integer (Количество комнат)",
+                    "floor": "integer (Этаж)",
+                    "floors_total": "integer (Этажность дома)",
+                    "area_total": "float (Общая площадь)",
+                    "area_living": "float (Жилая площадь)",
+                    "area_kitchen": "float (Площадь кухни)",
+                    "building_type": "string (Тип строения)",
+                    "layout": "string (Планировка)",
+                    "renovation": "string (Ремонт)",
+                    "furnished": "boolean (Меблирована)"
+                }
+            },
+            "doma-dachi": {
+                "attributes": {
+                    "offer_type": "string",
+                    "house_type": "string (Тип дома: Дом/Дача/Коттедж)",
+                    "floors": "integer (Этажность)",
+                    "rooms": "integer",
+                    "area_total": "float (Общая площадь)",
+                    "area_land": "float (Площадь участка)",
+                    "renovation": "string (Ремонт)",
+                    "water": "string (Вода)",
+                    "electricity": "string (Электричество)",
+                    "heating": "string (Отопление)",
+                    "gas": "string (Газ)"
+                }
+            },
+            "zemlya": {
+                "attributes": {
+                    "offer_type": "string",
+                    "area_land": "float (Площадь участка)",
+                    "located_near": "string (Расположение)",
+                    "purpose": "string (Назначение: ИЖС/Сельхоз/Пром)"
+                }
+            },
+            "kommercheskaya-nedvizhimost": {
+                "attributes": {
+                    "offer_type": "string",
+                    "type": "string (Тип офиса/помещения)",
+                    "area_total": "float",
+                    "located_in": "string (Расположен в)"
+                }
+            }
+        },
+        "rabota": {
+            "it-telekom-kompyutery": {
+                "attributes": {
+                    "job_type": "string (Тип работы)",
+                    "employment_type": "string (Тип занятости)",
+                    "salary_from": "integer",
+                    "salary_to": "integer",
+                    "experience": "string (Опыт работы)"
+                }
+            },
+            "logistika-sklad": {
+                "attributes": {
+                    "job_type": "string",
+                    "employment_type": "string",
+                    "salary_from": "integer",
+                    "salary_to": "integer"
+                }
+            },
+            "stroitelstvo-arhitektura": {
+                "attributes": {
+                    "job_type": "string",
+                    "employment_type": "string",
+                    "salary_from": "integer",
+                    "salary_to": "integer"
+                }
+            }
+        },
+        "elektronika": {
+            "telefony": {
+                "attributes": {
+                    "offer_type": "string",
+                    "brand": "string (Марка телефона)",
+                    "model": "string",
+                    "condition": "string (Состояние: Новый/Б/у)",
+                    "storage_capacity": "string (Объем памяти)"
+                }
+            },
+            "kompyutery": {
+                "attributes": {
+                    "offer_type": "string",
+                    "brand": "string (Марка)",
+                    "processor": "string (Процессор)",
+                    "ram": "string (ОЗУ)",
+                    "condition": "string (Состояние)"
+                }
+            },
+            "tehnika-dlya-doma": {
+                "attributes": {
+                    "offer_type": "string",
+                    "type": "string (Вид техники)",
+                    "brand": "string",
+                    "condition": "string"
+                }
+            }
+        },
+        "dom-i-sad": {
+            "mebel": {
+                "attributes": {
+                    "offer_type": "string",
+                    "subcategory": "string (Подкатегории)",
+                    "condition": "string (Состояние: Новый/Б/у)",
+                    "material": "string (Материал)"
+                }
+            },
+            "remont-i-stroitelstvo": {
+                "attributes": {
+                    "offer_type": "string",
+                    "type": "string (Вид услуги/товара)"
+                }
+            }
+        },
+        "moda-i-stil": {
+            "odezhda": {
+                "attributes": {
+                    "offer_type": "string",
+                    "size": "string (Размер)",
+                    "condition": "string (Состояние)",
+                    "brand": "string (Бренд)"
+                }
+            },
+            "dlya-svadby": {
+                "attributes": {
+                    "offer_type": "string",
+                    "type": "string (Вид товара)",
+                    "size": "string"
+                }
+            }
+        },
+        "detskiy-mir": {
+            "detskaya-odezhda": {
+                "attributes": {
+                    "offer_type": "string",
+                    "size": "string (Размер)",
+                    "condition": "string (Состояние)",
+                    "age_group": "string (Возраст)"
+                }
+            },
+            "detskie-kolyaski": {
+                "attributes": {
+                    "offer_type": "string",
+                    "brand": "string",
+                    "condition": "string"
+                }
+            }
+        }
+    }
+}
