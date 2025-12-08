@@ -24,9 +24,10 @@ Since IDs are non-sequential (alphanumeric hashes or large integers), ID iterati
 
 ### Phase B: Detail Extraction (The "Two-Tier" Scrape)
 Yandex separates **Models** (Abstract) from **Offers** (Sellers).
-1.  **Fetch Model Page**: Extract universal specs (Screen, RAM, Description) from `LD+JSON`.
-2.  **Fetch Offers Tab**: Extract specific seller prices, delivery times, and "in stock" status.
-3.  **Variants**: If a product has "Select Color", capture the linked Product IDs for other colors.
+1.  **Fetch Model Page**: `GET /product--{slug}/{id}`. Extract universal specs from `LD+JSON` and `apiary` state.
+2.  **Fetch Offers List**: `GET /product--{slug}/{id}/offers` (or the `/p/{id}` alias). This contains the aggregations of all sellers (Price, Delivery, SellerID).
+3.  **Fetch Specs Tab**: `GET /product--{slug}/{id}/spec`. Extract the full EAV attribute list if `apiary` on main page is incomplete.
+4.  **Variants**: If a product has "Select Color", capture the linked Product IDs for other colors from the main page JSON.
 
 ### Phase C: Anti-Bot Evasion
 - **User-Agent**: Must rotate modern Chrome/Desktop UAs.
