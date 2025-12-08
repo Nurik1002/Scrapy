@@ -70,27 +70,26 @@ services:
   # Workers
   # ===================
   celery_worker:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    command: celery -A src.workers.celery_app worker --loglevel=info --concurrency=50
-    deploy:
-      replicas: 4 # Run 4 parallel workers (total 200 threads)
-      resources:
-        limits:
-          cpus: "8"
-          memory: 16G
-    environment:
-      - DB_HOST=postgres
-      - DB_PORT=5432
-      - REDIS_HOST=redis
+    build: .
+    command: celery -A src.workers.celery_app worker --loglevel=info --concurrency=15
+    volumes:
+      - ./:/app
+      - ./storage:/app/storage
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
-    volumes:
-      - ./storage:/app/storage
+    environment:
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - REDIS_HOST=redis
+    deploy:
+      replicas: 4
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
 
   celery_beat:
     build:

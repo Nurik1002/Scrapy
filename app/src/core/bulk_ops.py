@@ -1,21 +1,38 @@
 """
-Bulk Operations - High-performance database operations.
+Bulk Operations - High-performance database operations with deadlock resilience.
 """
 import logging
 import asyncio
 from typing import List, Dict, Any, Type
 from datetime import datetime, timezone
 
-
+from tenacity import (
+    retry, 
+    stop_after_attempt, 
+    wait_exponential,
+    retry_if_exception_type
+)
 from sqlalchemy import text
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import DBAPIError
+from asyncpg.exceptions import DeadlockDetectedError
 
 from .models import Product, Seller, Category, SKU, PriceHistory
 # UzexLot and UzexLotItem should be imported from src.platforms.uzex.models when needed
 
 logger = logging.getLogger(__name__)
+
+
+# Retry decorator for deadlock handling
+deadlock_retry = retry(
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(multiplier=1, min=1, max=10),
+    retry=retry_if_exception_type(DeadlockDetectedError),
+    before_sleep=lambda retry_state: logger.warning(
+        f"Deadlock detected, retrying in {retry_state.next_action.sleep} seconds... (attempt {retry_state.attempt_number})"
+    )
+)
 
 
 async def retry_on_deadlock(func, *args, max_retries=5, initial_delay=0.1, **kwargs):
@@ -102,6 +119,7 @@ async def _bulk_upsert_categories_impl(
     return result.rowcount
 
 
+@deadlock_retry
 async def bulk_upsert_categories(
     session: AsyncSession,
     categories: List[Dict[str, Any]],
@@ -138,6 +156,7 @@ async def bulk_upsert_categories(
         return await retry_on_deadlock(_bulk_upsert_categories_impl, session, categories, platform)
 
 
+@deadlock_retry
 async def bulk_upsert_products(
     session: AsyncSession,
     products: List[Dict[str, Any]],
@@ -232,6 +251,7 @@ async def bulk_upsert_products(
     return result.rowcount
 
 
+@deadlock_retry
 async def bulk_upsert_sellers(
     session: AsyncSession,
     sellers: List[Dict[str, Any]],
@@ -291,6 +311,7 @@ async def bulk_upsert_sellers(
     return result.rowcount
 
 
+@deadlock_retry
 async def bulk_upsert_skus(
     session: AsyncSession,
     skus: List[Dict[str, Any]]
