@@ -3,7 +3,7 @@
 
 set -e
 
-DB_CONTAINER="${DB_CONTAINER:-app-postgres-1}"
+DB_CONTAINER="${DB_CONTAINER:-app_postgres_1}"
 DB_NAME="${DB_NAME:-uzum_scraping}"
 DB_USER="${DB_USER:-scraper}"
 

@@ -30,11 +30,11 @@ celery_app.conf.update(
     task_acks_late=True,
     task_reject_on_worker_lost=True,
     worker_prefetch_multiplier=1,
-    
-    # Long timeout for continuous tasks
-    task_soft_time_limit=21600,  # 6 hours
-    task_time_limit=25200,       # 7 hours hard limit
-    
+
+    # NO TIME LIMITS - Tasks run forever for continuous scraping
+    task_soft_time_limit=None,  # NO LIMIT - Runs forever
+    task_time_limit=None,       # NO LIMIT - Runs forever
+
     # Result settings
     result_expires=3600,
     

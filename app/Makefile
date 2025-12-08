@@ -66,7 +66,7 @@ infra:
 # =============================================================================
 
 db-shell:
-	docker exec -it uzum-postgres-1 psql -U scraper -d uzum_scraping
+	docker exec -it app_postgres_1 psql -U scraper -d uzum_scraping
 
 migrate:
 	@chmod +x scripts/migrate.sh

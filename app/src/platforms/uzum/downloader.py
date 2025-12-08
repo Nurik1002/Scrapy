@@ -275,10 +275,12 @@ class UzumDownloader:
                 
                 # CRITICAL: Insert in correct dependency order to avoid FK violations
                 # 1. Categories FIRST (no dependencies)
+                # Use skip_on_contention=True to avoid deadlocks during continuous scraping
+                # Categories are relatively static (only 4,349 total), so OK to skip on lock contention
                 for i in range(0, len(categories_list), CHUNK_SIZE):
                     chunk = categories_list[i:i + CHUNK_SIZE]
                     if chunk:
-                        await bulk_upsert_categories(session, chunk, "uzum")
+                        await bulk_upsert_categories(session, chunk, "uzum", skip_on_contention=True)
                 
                 # 2. Sellers (no dependencies)
                 for i in range(0, len(sellers_list), CHUNK_SIZE):
