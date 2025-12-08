@@ -27,28 +27,28 @@ def run_async(coro):
         loop.close()
 
 
-@shared_task(bind=True, max_retries=None, soft_time_limit=21600)  # 6 hour limit, infinite retries
+@shared_task(bind=True, max_retries=None)  # NO TIME LIMIT - Runs forever, infinite retries
 def continuous_scan(
     self,
     platform: str = "uzum",
     batch_target: int = 10000,
-    pause_between_cycles: int = 300,  # 5 min pause between full cycles
+    pause_between_cycles: int = 60,  # 1 min pause between full cycles
     max_id: int = 3000000
 ) -> dict:
     """
-    Continuously scan products in endless loop.
-    
-    This task runs forever, cycling through product IDs and resuming
-    automatically after any crash or restart.
-    
+    Continuously scan products in endless loop - RUNS FOREVER, NEVER STOPS.
+
+    This task runs FOREVER, cycling through product IDs and resuming
+    automatically after any crash or restart. NO time limits, NO stopping.
+
     Args:
         platform: Target platform (uzum, uzex)
         batch_target: Products to find per mini-batch before checkpoint
         pause_between_cycles: Seconds to wait between full cycles
         max_id: Maximum product ID to scan
-        
+
     Returns:
-        Status dict (only on graceful stop)
+        Status dict (only on graceful stop - never happens)
     """
     logger.info(f"🚀 Starting CONTINUOUS scan for {platform}")
     
@@ -129,7 +129,7 @@ def continuous_scan(
                     
                 elif platform == "uzex":
                     from src.platforms.uzex import UzexDownloader
-                    
+
                     downloader = UzexDownloader(batch_size=100)
                     stats = await downloader.download_lots(
                         lot_type="auction",
@@ -137,7 +137,7 @@ def continuous_scan(
                         target=batch_target,
                         start_from=current_position,
                         resume=True,
-                        skip_existing=True
+                        skip_existing=False  # Re-download to update & catch new lots
                     )
                     
                     total_found += stats.found

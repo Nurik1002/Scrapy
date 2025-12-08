@@ -2,6 +2,7 @@
 Bulk Operations - High-performance database operations.
 """
 import logging
+import asyncio
 from typing import List, Dict, Any, Type
 from datetime import datetime, timezone
 
@@ -9,6 +10,7 @@ from datetime import datetime, timezone
 from sqlalchemy import text
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.exc import DBAPIError
 
 from .models import Product, Seller, Category, SKU, PriceHistory
 # UzexLot and UzexLotItem should be imported from src.platforms.uzex.models when needed
@@ -16,33 +18,69 @@ from .models import Product, Seller, Category, SKU, PriceHistory
 logger = logging.getLogger(__name__)
 
 
-async def bulk_upsert_categories(
+async def retry_on_deadlock(func, *args, max_retries=5, initial_delay=0.1, **kwargs):
+    """
+    Retry async function on deadlock with exponential backoff.
+
+    Args:
+        func: Async function to retry
+        max_retries: Maximum number of retry attempts
+        initial_delay: Initial delay in seconds (doubles each retry)
+
+    Returns:
+        Result from successful function call
+
+    Raises:
+        Last exception if all retries fail
+    """
+    delay = initial_delay
+    last_exception = None
+
+    for attempt in range(max_retries):
+        try:
+            return await func(*args, **kwargs)
+        except DBAPIError as e:
+            error_str = str(e)
+            # Check for deadlock or lock timeout errors
+            if "deadlock detected" in error_str.lower() or "lock" in error_str.lower():
+                last_exception = e
+                if attempt < max_retries - 1:
+                    # Add jitter to prevent thundering herd
+                    jitter = delay * 0.5 * (0.5 + asyncio.get_event_loop().time() % 1.0)
+                    wait_time = delay + jitter
+                    logger.warning(f"Deadlock detected (attempt {attempt + 1}/{max_retries}), retrying in {wait_time:.2f}s...")
+                    await asyncio.sleep(wait_time)
+                    delay *= 2  # Exponential backoff
+                else:
+                    logger.error(f"Max retries ({max_retries}) exceeded for deadlock")
+                    raise
+            else:
+                # Not a deadlock, re-raise immediately
+                raise
+
+    # Should never reach here, but just in case
+    if last_exception:
+        raise last_exception
+
+
+async def _bulk_upsert_categories_impl(
     session: AsyncSession,
     categories: List[Dict[str, Any]],
     platform: str = "uzum"
 ) -> int:
     """
-    Bulk upsert categories - MUST be called BEFORE products to avoid FK violations.
-    
-    Args:
-        session: Database session
-        categories: List of category dicts with 'id' and 'title'
-        platform: Platform name
-        
-    Returns:
-        Number of rows affected
+    Internal implementation of bulk category upsert.
+    Use bulk_upsert_categories() which includes retry logic.
     """
     if not categories:
         return 0
-    
+
     # Deduplicate by ID (keep last occurrence)
     seen_ids = {}
     for c in categories:
         seen_ids[c["id"]] = c
     categories = list(seen_ids.values())
-    
-    logger.info(f"Bulk upserting {len(categories)} categories for {platform}")
-    
+
     # Simple upsert using ON CONFLICT - minimal fields to avoid errors
     values = []
     for c in categories:
@@ -51,7 +89,7 @@ async def bulk_upsert_categories(
             "platform": platform,
             "title": c.get("title") or "Unknown",
         })
-    
+
     stmt = insert(Category).values(values)
     stmt = stmt.on_conflict_do_update(
         index_elements=["id"],
@@ -59,9 +97,45 @@ async def bulk_upsert_categories(
             "title": stmt.excluded.title,
         }
     )
-    
+
     result = await session.execute(stmt)
     return result.rowcount
+
+
+async def bulk_upsert_categories(
+    session: AsyncSession,
+    categories: List[Dict[str, Any]],
+    platform: str = "uzum",
+    skip_on_contention: bool = False
+) -> int:
+    """
+    Bulk upsert categories with deadlock retry logic.
+
+    Args:
+        session: Database session
+        categories: List of category dicts with 'id' and 'title'
+        platform: Platform name
+        skip_on_contention: If True, skip and return 0 on deadlock (for continuous scraping)
+
+    Returns:
+        Number of rows affected (0 if skipped)
+    """
+    if not categories:
+        return 0
+
+    if skip_on_contention:
+        # During continuous scraping, categories rarely change, so skip on contention
+        try:
+            return await _bulk_upsert_categories_impl(session, categories, platform)
+        except DBAPIError as e:
+            if "deadlock" in str(e).lower() or "lock" in str(e).lower():
+                logger.debug(f"Skipping {len(categories)} categories due to lock contention (skip_on_contention=True)")
+                return 0
+            raise
+    else:
+        # For initial loads, retry on deadlock
+        logger.info(f"Bulk upserting {len(categories)} categories for {platform}")
+        return await retry_on_deadlock(_bulk_upsert_categories_impl, session, categories, platform)
 
 
 async def bulk_upsert_products(

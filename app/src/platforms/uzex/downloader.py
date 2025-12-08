@@ -52,12 +52,18 @@ class UzexDownloader:
         "national": {"completed": "get_completed_shop", "active": "get_active_shop"},
     }
     
-    def __init__(self, batch_size: int = 100, save_raw: bool = True):
+    def __init__(self, batch_size: int = 100, save_raw: bool = True, db_batch_size: int = 100):
         self.batch_size = batch_size
         self.save_raw = save_raw
+        self.db_batch_size = db_batch_size
         self.client = UzexClient()
         self.stats = DownloadStats()
         self._save_dir: Optional[Path] = None
+
+        # Buffers for batch DB inserts (using dicts for deduplication)
+        self._lots_buffer: Dict[int, Dict] = {}
+        self._items_buffer: List[Dict] = []
+        self.db_inserts = 0
     
     async def download_lots(
         self,
@@ -93,9 +99,9 @@ class UzexDownloader:
             saved = await checkpoint.load_checkpoint()
             if saved:
                 start_from = saved.get("last_index", 1)
-                self.stats.found = saved.get("found", 0)
-                self.stats.processed = saved.get("processed", 0)
-                logger.info(f"📍 Resuming from index {start_from} (found: {self.stats.found})")
+                # DON'T load found/processed counts - they're cumulative totals
+                # We want to count NEW lots in THIS run, not total from all time
+                logger.info(f"📍 Resuming from index {start_from}")
         
         # Setup save directory
         if self.save_raw:
@@ -162,12 +168,19 @@ class UzexDownloader:
                         # Save raw
                         if self.save_raw:
                             await self._save_raw(lot)
-                        
+
+                        # Process for DB insertion
+                        self._process_lot(lot)
+
                         # Callback
                         if on_lot:
                             on_lot(lot)
-                
+
                 self.stats.processed += len(data)
+
+                # Flush to DB if buffer gets big
+                if len(self._lots_buffer) >= self.db_batch_size:
+                    await self._flush_to_db()
                 
                 # Save checkpoint every batch
                 await checkpoint.save_checkpoint({
@@ -194,10 +207,12 @@ class UzexDownloader:
                     break
         
         finally:
+            # Flush remaining lots to DB
+            await self._flush_to_db()
             await self.client.close()
             await checkpoint.close()
-        
-        logger.info(f"✅ Done! Found {self.stats.found:,} lots")
+
+        logger.info(f"✅ Done! Found {self.stats.found:,} lots, inserted {self.db_inserts:,} to DB")
         return self.stats
     
     async def download_categories(self) -> List[Dict]:
@@ -265,6 +280,92 @@ class UzexDownloader:
         except Exception as e:
             self.stats.errors += 1
             logger.error(f"Save error: {e}")
+
+    def _process_lot(self, lot: LotData):
+        """Convert LotData to dict and add to buffers."""
+        try:
+            # Add lot to buffer (deduplicated by ID)
+            self._lots_buffer[lot.id] = {
+                "id": lot.id,
+                "display_no": lot.display_no,
+                "lot_type": lot.lot_type,
+                "status": lot.status,
+                "is_budget": lot.is_budget,
+                "type_name": lot.type_name,
+                "start_cost": lot.start_cost,
+                "deal_cost": lot.deal_cost,
+                "currency_name": lot.currency_name,
+                "customer_name": lot.customer_name,
+                "customer_inn": lot.customer_inn,
+                "provider_name": lot.provider_name,
+                "provider_inn": lot.provider_inn,
+                "deal_id": lot.deal_id,
+                "deal_date": lot.deal_date,
+                "category_name": lot.category_name,
+                "pcp_count": lot.pcp_count,
+                "lot_start_date": lot.lot_start_date,
+                "lot_end_date": lot.lot_end_date,
+                "kazna_status": lot.kazna_status,
+                "raw_data": lot.raw_data,
+            }
+
+            # Add items to buffer
+            if lot.items:
+                for item in lot.items:
+                    self._items_buffer.append({
+                        "lot_id": lot.id,
+                        "order_num": item.order_num,
+                        "product_name": item.product_name,
+                        "description": item.description,
+                        "quantity": item.quantity,
+                        "amount": item.amount,
+                        "measure_name": item.measure_name,
+                        "price": item.price,
+                        "cost": item.cost,
+                        "country_name": item.country_name,
+                        "properties": item.properties,
+                    })
+        except Exception as e:
+            self.stats.errors += 1
+            logger.error(f"Error processing lot {lot.id}: {e}")
+
+    async def _flush_to_db(self):
+        """Flush buffers to database."""
+        if not self._lots_buffer:
+            return
+
+        try:
+            from src.core.database import get_session
+            from src.core.bulk_ops import (
+                bulk_upsert_uzex_lots,
+                bulk_insert_uzex_items,
+            )
+
+            async with get_session() as session:
+                # Convert dicts to lists
+                lots_list = list(self._lots_buffer.values())
+                items_list = self._items_buffer
+
+                # Insert lots first (parent table)
+                if lots_list:
+                    count = await bulk_upsert_uzex_lots(session, lots_list)
+                    self.db_inserts += count
+                    logger.info(f"Bulk upserting {len(lots_list)} UZEX lots")
+
+                # Insert items (child table)
+                if items_list:
+                    await bulk_insert_uzex_items(session, items_list)
+                    logger.info(f"Bulk inserting {len(items_list)} UZEX lot items")
+
+                await session.commit()
+
+        except Exception as e:
+            logger.error(f"DB flush error: {e}")
+            self.stats.errors += 1
+        finally:
+            # CRITICAL: Clear buffers even on error to prevent infinite accumulation
+            self._lots_buffer.clear()
+            self._items_buffer.clear()
 
 
 async def main():

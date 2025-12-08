@@ -16,6 +16,7 @@ class LotItem:
     product_name: Optional[str] = None
     description: Optional[str] = None
     quantity: float = 0
+    amount: float = 0  # Total amount (quantity × price typically)
     measure_name: Optional[str] = None
     price: float = 0
     cost: float = 0

@@ -73,9 +73,9 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    command: celery -A src.workers.celery_app worker --loglevel=info --concurrency=100
+    command: celery -A src.workers.celery_app worker --loglevel=info --concurrency=50
     deploy:
-      replicas: 4 # Run 4 parallel workers (total 400 threads)
+      replicas: 4 # Run 4 parallel workers (total 200 threads)
       resources:
         limits:
           cpus: "8"
