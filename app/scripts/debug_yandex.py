@@ -1,109 +1,198 @@
+#!/usr/bin/env python3
+"""
+Yandex Scraper with Debug Mode
+Enhanced logging and real-time progress tracking
+"""
 
 import asyncio
 import sys
 import os
-import json
+import logging
 from datetime import datetime
+from pathlib import Path
 
-# Add app directory to path so we can import src
-sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+# Add project root to path
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from src.platforms.yandex.debug_config import enable_full_debug, disable_debug
-from src.platforms.yandex.platform import create_yandex_platform
-from src.core.config import settings
+from src.platforms.yandex.platform import YandexPlatform
+from src.core.database import get_async_session
 
-async def main():
-    print("🚀 Starting Yandex Debug Session")
+# Configure debug logging
+def setup_debug_logging():
+    """Setup comprehensive debug logging"""
     
-    # Enable detailed logging
-    # We log to console for immediate feedback as requested ("Show loggers!")
-    enable_full_debug()
+    # Create logs directory
+    log_dir = Path('logs')
+    log_dir.mkdir(exist_ok=True)
     
-    platform = None
+    # Create timestamp-based log file
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    log_file = log_dir / f'yandex_debug_{timestamp}.log'
+    
+    # Configure root logger
+    logging.basicConfig(
+        level=logging.DEBUG,
+        format='%(asctime)s [%(levelname)s] %(name)s: %(message)s',
+        handlers=[
+            # File handler with DEBUG level
+            logging.FileHandler(log_file, encoding='utf-8'),
+            # Console handler with INFO level
+            logging.StreamHandler(sys.stdout)
+        ]
+    )
+    
+    # Set specific loggers
+    loggers = {
+        'src.platforms.yandex': logging.DEBUG,
+        'src.core.database': logging.INFO,
+        'sqlalchemy.engine': logging.WARNING,  # Too verbose at DEBUG
+        'asyncio': logging.WARNING,
+    }
+    
+    for logger_name, level in loggers.items():
+        logging.getLogger(logger_name).setLevel(level)
+    
+    logger = logging.getLogger(__name__)
+    logger.info(f"Debug logging initialized.Log file: {log_file}")
+    
+    return logger, log_file
+
+async def test_yandex_scraper(category_limit=5, products_per_category=10):
+    """Test Yandex scraper with debug output"""
+    
+    logger, log_file = setup_debug_logging()
+    
+    logger.info("="*80)
+    logger.info("YANDEX SCRAPER DEBUG TEST")
+    logger.info("="*80)
+    logger.info(f"Category limit: {category_limit}")
+    logger.info(f"Products per category: {products_per_category}")
+    logger.info(f"Log file: {log_file}")
+    
     try:
-        platform = create_yandex_platform()
+        # Initialize platform
+        logger.info("Initializing Yandex platform...")
+        platform = YandexPlatform()
         
-        # Open context (initializes client etc)
-        await platform.__aenter__()
-        
-        print("\n🏥 Running Health Check...")
-        is_healthy = await platform.client.health_check()
-        print(f"Health Check Result: {'✅ PASS' if is_healthy else '❌ FAIL'}")
-        
-        if not is_healthy:
-            print("⚠️ Warning: Health check failed. Proceeding anyway but expect issues.")
-
-        # Search for a product to test with
-        search_query = "iphone 15"
-        print(f"\nmagnifying_glass_tilted_left: Searching for '{search_query}'...")
-        
-        search_results = await platform.client.search_products(search_query)
-        
-        target_product = None
-        
-        if search_results and 'json_data' in search_results:
-             # Try to find a product in the search results
-             print("Search completed. Saving HTML to debug_search.html...")
-             # Re-fetch with HTML included if search_results doesn't have it (client.search_products doesn't return raw HTML in the dict, only json_data?)
-             # Wait, client.search_products returns dict with 'json_data'.
-             # Let's check client.search_products implementation.
-             # It returns 'json_data': json_data ... and 'url'.
-             # It DOES NOT return 'html'.
-             
-             # We should probably modify client to return HTML or fetch it again here.
-             # Or rely on client logging which we can see if we used file logging.
-             
-             # Let's modify client.search_products to return HTML in debug mode? 
-             # Or just fetch here manually.
-             
-             search_url = platform.client.SEARCH_URL.format(base=platform.client.BASE_URL)
-             html = await platform.client._fetch_html(search_url + "?text=" + search_query)
-             if html:
-                 with open("debug_search.html", "w") as f:
-                     f.write(html)
-                 print("✅ Saved debug_search.html")
-             
-             pass
-        
-        # If search is tricky to parse without knowing structure, 
-        # let's try a known ID if possible, or just fail gracefully if search doesn't return obvious list
-        # Yandex IDs are confusing. Let's try to just use valid IDs if we find them.
-        
-        # But wait, the user wants me to "Run yandex!".
-        # I'll try to discover some products if search structure is unknown.
-        
-        print("\n🗺️  Attempting Category Discovery (short run)...")
-        # We'll run discovery for a few seconds or until we find 1 product
-        
-        count = 0
-        count = 0
-        async for product_data in platform.discover_products_by_categories():
-            pid = product_data.get('product_id')
-            title = product_data.get('model_data', {}).get('title', 'Unknown')
-            offers_count = len(product_data.get('offers_data', []))
-            specs_count = len(product_data.get('specs_data', {}))
+        # Get database session
+        logger.info("Connecting to database...")
+        async for session in get_async_session():
+            # Test category discovery
+            logger.info("Testing category walker...")
+            categories = await platform.discover_categories(max_categories=category_limit)
+            logger.info(f"Found {len(categories)} categories")
             
-            print(f"\n✨ Processed Product: {pid}")
-            print(f"Title: {title}")
-            print(f"Offers: {offers_count}")
-            print(f"Specs: {specs_count}")
+            for idx, category in enumerate(categories, 1):
+                logger.info(f"Category {idx}/{len(categories)}: {category.get('name', 'Unknown')}")
             
-            count += 1
-            if count >= 1:
-                break
+            # Test product scraping
+            if categories:
+                logger.info(f"\nTesting product scraping from first category...")
+                first_cat = categories[0]
+                logger.info(f"Target category: {first_cat.get('name')}")
+                
+                products = await platform.scrape_category(
+                    category_url=first_cat.get('url'),
+                    max_products=products_per_category
+                )
+                
+                logger.info(f"Scraped {len(products)} products")
+                
+                for idx, product in enumerate(products[:3], 1):
+                    logger.info(f"Product {idx}: {product.get('title', 'Unknown')[:50]}...")
+            
+            # Database health check
+            logger.info("\nChecking database health...")
+            result = await session.execute("SELECT COUNT(*) FROM products WHERE platform='yandex'")
+            yandex_count = result.scalar()
+            logger.info(f"Yandex products in DB: {yandex_count}")
+            
+        logger.info("\n" + "="*80)
+        logger.info("TEST COMPLETED SUCCESSFULLY")
+        logger.info("="*80)
+        logger.info(f"Full debug log saved to: {log_file}")
         
-        if count == 0:
-            print("\n⚠️ No products discovered/downloaded in the short run.")
-
+        return True
+        
     except Exception as e:
-        print(f"\n❌ FATAL ERROR: {e}")
-        import traceback
-        traceback.print_exc()
-    finally:
-        if platform:
-            await platform.__aexit__(None, None, None)
-        disable_debug()
-        print("\n🏁 Debug Session Ended")
+        logger.error("="*80)
+        logger.error("TEST FAILED")
+        logger.error("="*80)
+        logger.exception(f"Error: {e}")
+        logger.error(f"Check full log: {log_file}")
+        return False
+
+async def continuous_yandex_debug():
+    """Run Yandex scraper in continuous debug mode"""
+    
+    logger, log_file = setup_debug_logging()
+    
+    logger.info("Starting continuous Yandex scraping (DEBUG MODE)")
+    logger.info(f"Log file: {log_file}")
+    logger.info("Press Ctrl+C to stop\n")
+    
+    platform = YandexPlatform()
+    
+    try:
+        async for session in get_async_session():
+            cycle = 1
+            while True:
+                logger.info(f"\n{'='*60}")
+                logger.info(f"SCRAPING CYCLE #{cycle}")
+                logger.info(f"{'='*60}")
+                
+                # Discover categories
+                logger.info("Phase 1: Category Discovery")
+                categories = await platform.discover_categories(max_categories=50)
+                logger.info(f"Found {len(categories)} categories")
+                
+                # Scrape products from each category
+                logger.info("Phase 2: Product Scraping")
+                total_products = 0
+                
+                for idx, category in enumerate(categories, 1):
+                    logger.info(f"\nScraping category {idx}/{len(categories)}: {category.get('name')}")
+                    
+                    products = await platform.scrape_category(
+                        category_url=category.get('url'),
+                        max_products=100
+                    )
+                    
+                    logger.info(f"  → Scraped {len(products)} products")
+                    total_products += len(products)
+                
+                logger.info(f"\nCycle #{cycle} complete: {total_products} total products")
+                logger.info("Waiting 60 seconds before next cycle...")
+                
+                await asyncio.sleep(60)
+                cycle += 1
+                
+    except KeyboardInterrupt:
+        logger.info("\nScraping stopped by user")
+    except Exception as e:
+        logger.exception(f"Fatal error: {e}")
+
+def main():
+    """Main entry point"""
+    import argparse
+    
+    parser = argparse.ArgumentParser(description='Yandex Scraper Debug Tool')
+    parser.add_argument('--test', action='store_true', help='Run test mode (limited scraping)')
+    parser.add_argument('--continuous', action='store_true', help='Run continuous scraping')
+    parser.add_argument('--categories', type=int, default=5, help='Number of categories (test mode)')
+    parser.add_argument('--products', type=int, default=10, help='Products per category (test mode)')
+    
+    args = parser.parse_args()
+    
+    if args.continuous:
+        asyncio.run(continuous_yandex_debug())
+    else:
+        # Default: test mode
+        success = asyncio.run(test_yandex_scraper(
+            category_limit=args.categories,
+            products_per_category=args.products
+        ))
+        sys.exit(0 if success else 1)
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()

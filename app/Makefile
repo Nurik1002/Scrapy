@@ -455,3 +455,80 @@ info:
 
 # Show this help
 .DEFAULT_GOAL := help
+
+# =============================================================================
+# Real-time Monitoring (Terminal-based)
+# =============================================================================
+
+# All-in-one dashboard (recommended)
+dashboard:
+	@echo "🎯 Starting Monitoring Dashboard..."
+	@python scripts/dashboard.py
+
+# Database monitoring
+monitor-db:
+	@echo "📊 Starting Database Monitor..."
+	@python scripts/monitor.py
+
+# Worker monitoring  
+monitor-workers:
+	@echo "👷 Starting Worker Monitor..."
+	@python scripts/monitor_workers.py
+
+# Real-time log tailing
+tail:
+	@echo "📋 Starting Log Aggregator..."
+	@chmod +x scripts/tail_logs.sh
+	@./scripts/tail_logs.sh
+
+# =============================================================================
+# Debug & Testing
+# =============================================================================
+
+# Debug Yandex scraper (test mode)
+debug-yandex:
+	@echo "🔍 Running Yandex Scraper in DEBUG mode..."
+	@mkdir -p logs
+	@python scripts/debug_yandex.py --test --categories 3 --products 5
+
+# Debug Yandex scraper (continuous mode)
+debug-yandex-continuous:
+	@echo "🔄 Running Yandex Scraper in continuous DEBUG mode..."
+	@mkdir -p logs
+	@python scripts/debug_yandex.py --continuous
+
+# Debug Uzum scraper
+debug-uzum:
+	@echo "🔍 Running Uzum Scraper in DEBUG mode..."
+	@mkdir -p logs
+	@python -m src.platforms.uzum.downloader --target 100 2>&1 | tee logs/uzum_debug_$$(date +%Y%m%d_%H%M%S).log
+
+# Debug UZEX scraper
+debug-uzex:
+	@echo "🔍 Running UZEX Scraper in DEBUG mode..."
+	@mkdir -p logs
+	@python -m src.platforms.uzex.downloader --type auction --target 20 2>&1 | tee logs/uzex_debug_$$(date +%Y%m%d_%H%M%S).log
+
+# View latest debug log
+view-log:
+	@echo "📋 Latest debug logs:"
+	@ls -lt logs/*.log 2>/dev/null | head -5 || echo "No logs found"
+
+# Quick table counts
+quick-counts:
+	@docker compose exec -T postgres psql -U scraper -d uzum_scraping -c "SELECT 'products' as tbl, COUNT(*) FROM products UNION ALL SELECT 'skus', COUNT(*) FROM skus UNION ALL SELECT 'sellers', COUNT(*) FROM sellers UNION ALL SELECT 'uzex_lots', COUNT(*) FROM uzex_lots;"
+
+# Celery status
+celery-status:
+	@celery -A src.workers.celery_app inspect ping 2>/dev/null || echo "Workers offline"
+	@celery -A src.workers.celery_app inspect active 2>/dev/null | head -10
+
+# Redis checkpoints
+checkpoints:
+	@docker compose exec -T redis redis-cli KEYS 'checkpoint:*' 2>/dev/null || echo "Redis not accessible"
+
+# Debug all platforms
+debug-all:
+	@make debug-uzum
+	@make debug-yandex
+	@make debug-uzex
