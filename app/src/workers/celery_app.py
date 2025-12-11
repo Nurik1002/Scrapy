@@ -53,87 +53,15 @@ celery_app.autodiscover_tasks([
     'src.workers.maintenance_tasks',       # NEW: Maintenance tasks
     'src.workers.olx_tasks',               # OLX scraper tasks
     'src.workers.yandex_tasks',            # ENABLED: Yandex Market scraper (847 lines)
+    'src.workers.yandex_continuous',       # ENABLED: Yandex continuous non-stop scraper
 ])
 
 # ==============================================================================
 # Beat schedule for NON-STOP 24/7 scraping operation
 # ==============================================================================
-celery_app.conf.beat_schedule = {
-    # ==========================================================================
-    # CONTINUOUS SCRAPING - Self-healing with periodic restart checks
-    # ==========================================================================
-    
-    # Ensure Uzum scraper is running (restart if stale) - every 2 hours
-    'ensure-uzum-running': {
-        'task': 'src.workers.maintenance_tasks.ensure_scrapers_running',
-        'schedule': crontab(minute=0, hour='*/2'),
-    },
-    
-    # ==========================================================================
-    # HEALTH MONITORING
-    # ==========================================================================
-    
-    # Health check every hour
-    'hourly-health-check': {
-        'task': 'src.workers.maintenance_tasks.health_check',
-        'schedule': crontab(minute=30),
-    },
-    
-    # ==========================================================================
-    # DATABASE MAINTENANCE
-    # ==========================================================================
-    
-    # Daily VACUUM at 4 AM (low activity)
-    'daily-vacuum-4am': {
-        'task': 'src.workers.maintenance_tasks.vacuum_tables',
-        'schedule': crontab(hour=4, minute=0),
-    },
-    
-    # ==========================================================================
-    # ANALYTICS
-    # ==========================================================================
-    
-    # Daily analytics at 3 AM
-    'daily-analytics-3am': {
-        'task': 'src.workers.analytics_tasks.calculate_daily_stats',
-        'schedule': crontab(hour=3, minute=0),
-        'args': ('uzum',),
-    },
-    
-    # Price change detection every 6 hours
-    'price-alerts-6h': {
-        'task': 'src.workers.analytics_tasks.detect_price_changes',
-        'schedule': crontab(hour='*/6', minute=15),
-        'args': ('uzum',),
-    },
-    
-    # ==========================================================================
-    # YANDEX MARKET SCRAPING - Daily discovery and updates
-    # ==========================================================================
-    
-    # Daily Yandex category discovery at 2 AM
-    'daily-yandex-discovery-2am': {
-        'task': 'yandex.discover_categories',  # Actual task name from yandex_tasks.py
-        'schedule': crontab(hour=2, minute=0),
-    },
-    
-    # Yandex offers update every 12 hours
-    'yandex-offers-update-12h': {
-        'task': 'yandex.update_offers',  # Actual task name from yandex_tasks.py
-        'schedule': crontab(hour='*/12', minute=30),
-        'args': ([], 24),  # Empty product list (will find stale), max age 24 hours
-    },
-    
-    # Yandex health check every 6 hours
-    'yandex-health-check-6h': {
-        'task': 'yandex.health_check',  # Actual task name from yandex_tasks.py
-        'schedule': crontab(hour='*/6', minute=45),
-    },
-    
-    # Weekly Yandex data cleanup (Sundays at 5 AM)
-    'weekly-yandex-cleanup': {
-        'task': 'yandex.cleanup_data',  # Actual task name from yandex_tasks.py
-        'schedule': crontab(hour=5, minute=0, day_of_week=0),
-        'kwargs': {'older_than_days': 30, 'dry_run': False},
-    },
-}
+# DISABLED: Switched to pure continuous non-stop scraping mode
+# All scrapers run continuously without cron scheduling
+
+# celery_app.conf.beat_schedule = {
+#     # All schedules disabled - using continuous_scan tasks instead
+# }
