@@ -225,7 +225,7 @@ PLATFORMS = {
         concurrency=20,
         requires_proxy=True,
         rate_limit=120,
-        enabled=False,  # Not implemented yet
+        enabled=True,  # ENABLED: Fully implemented with 3 Celery tasks
     ),
     # B2B Procurement Platforms
     "uzex": PlatformConfig(
