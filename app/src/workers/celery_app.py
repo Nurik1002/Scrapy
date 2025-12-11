@@ -51,6 +51,7 @@ celery_app.autodiscover_tasks([
     'src.workers.analytics_tasks',
     'src.workers.continuous_scraper',     # NEW: Continuous scraping
     'src.workers.maintenance_tasks',       # NEW: Maintenance tasks
+    'src.workers.olx_tasks',               # OLX scraper tasks
 ])
 
 # ==============================================================================

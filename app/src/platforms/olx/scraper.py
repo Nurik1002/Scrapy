@@ -121,12 +121,15 @@ class OLXClient:
         
     async def get_categories(self) -> List[Dict]:
         """Get all OLX categories"""
-        url = f"{self.config.api_base}/categories"
-        data = await self._fetch_json(url)
-        
-        if data and "data" in data:
-            return data["data"]
-        return []
+        # OLX doesn't have a public categories endpoint
+        # Use hardcoded popular categories instead
+        return [
+            {"id": "transport", "name": "Transport"},
+            {"id": "elektronika", "name": "Electronics"},
+            {"id": "nedvizhimost", "name": "Real Estate"},
+            {"id": "dom-i-sad", "name": "Home & Garden"},
+            {"id": "lichnye-veschi", "name": "Personal Items"},
+        ]
         
     async def get_listings(self, category_id: int = None, region_id: int = None, 
                           page: int = 1, filters: Dict = None) -> Optional[Dict]:
@@ -179,12 +182,14 @@ class OLXScraper:
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         await self.client.__aexit__(exc_type, exc_val, exc_tb)
         
-    async def scrape_category(self, category_id: int, max_pages: int = 25) -> List[Dict]:
+    async def scrape_category(self, category_slug: str, max_pages: int = 25) -> List[Dict]:
         """Scrape all listings from a category"""
         listings = []
         
         for page in range(1, max_pages + 1):
-            data = await self.client.get_listings(category_id=category_id, page=page)
+            # Use category in URL path instead of parameter
+            url = f"{self.client.config.api_base}/offers/"
+            data = await self.client._fetch_json(url, params={"page": page, "limit": 40, "category_slug": category_slug})
             
             if not data or "data" not in data:
                 break
@@ -194,7 +199,7 @@ class OLXScraper:
                 break
                 
             listings.extend(page_listings)
-            logger.info(f"Category {category_id} page {page}: {len(page_listings)} listings")
+            logger.info(f"Category {category_slug} page {page}: {len(page_listings)} listings")
             
             # Check if there are more pages
             if len(page_listings) < 40:
@@ -219,11 +224,11 @@ class OLXScraper:
         
         for cat in categories:
             try:
-                cat_id = cat.get("id")
+                cat_slug = cat.get("id")
                 cat_name = cat.get("name", "Unknown")
-                logger.info(f"Scraping category: {cat_name} (ID: {cat_id})")
+                logger.info(f"Scraping category: {cat_name} (slug: {cat_slug})")
                 
-                listings = await self.scrape_category(cat_id)
+                listings = await self.scrape_category(cat_slug)
                 all_listings.extend(listings)
                 
                 self.stats["categories_scraped"] += 1
@@ -261,9 +266,12 @@ class OLXScraper:
             "status": "active" if raw_listing.get("status") == "active" else "inactive",
         }
     
-    async def _parse_seller(self, raw_listing: Dict) -> Dict:
+    async def _parse_seller(self, raw_listing: Dict) -> Optional[Dict]:
         """Parse seller data from listing"""
-        user_data = raw_listing.get("user", {})
+        user_data = raw_listing.get("user")
+        if not user_data or not user_data.get("id"):
+            return None  # No seller data available
+            
         return {
             "external_id": str(user_data.get("id", "")),
             "source": "olx.uz",
@@ -290,11 +298,12 @@ class OLXScraper:
             for listing in listings:
                 try:
                     seller_data = await self._parse_seller(listing)
-                    seller_ext_id = seller_data["external_id"]
-                    if seller_ext_id not in seller_map:
-                        seller_map[seller_ext_id] = seller_data
+                    if seller_data:  # Only process if seller data exists
+                        seller_ext_id = seller_data["external_id"]
+                        if seller_ext_id not in seller_map:
+                            seller_map[seller_ext_id] = seller_data
                 except Exception as e:
-                    logger.error(f"Error parsing seller: {e}")
+                    logger.debug(f"Error parsing seller: {e}")
             
             # Insert sellers
             if seller_map:
