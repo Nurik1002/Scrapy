@@ -34,12 +34,12 @@ from ..platforms.yandex import (
     create_yandex_client,
     create_yandex_platform,
 )
-from ..schemas.ecommerce import (
-    EcommerceCategory,
-    EcommerceOffer,
-    EcommercePriceHistory,
-    EcommerceProduct,
-    EcommerceSeller,
+from ..core.models import (
+    Category as EcommerceCategory,
+    SKU as EcommerceOffer,
+    PriceHistory as EcommercePriceHistory,
+    Product as EcommerceProduct,
+    Seller as EcommerceSeller,
 )
 from .celery_app import celery_app
 

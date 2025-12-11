@@ -95,7 +95,7 @@ class UzexSession:
                 await page.goto(
                     f"{self.SITE_URL}/completed-deals/auction",
                     wait_until="networkidle",
-                    timeout=30000
+                    timeout=60000
                 )
                 
                 # Wait for content to load

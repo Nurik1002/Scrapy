@@ -217,6 +217,8 @@ def check_continuous_status(platform: str = "uzum") -> dict:
         last_run = saved.get("last_run")
         if last_run:
             last_run_dt = datetime.fromisoformat(last_run.replace('Z', '+00:00'))
+            if last_run_dt.tzinfo is None:
+                last_run_dt = last_run_dt.replace(tzinfo=timezone.utc)
             age = (datetime.now(timezone.utc) - last_run_dt).total_seconds()
         else:
             age = None

@@ -1,15 +1,15 @@
 """
-Multi-Database Alembic Environment Configuration
+Single Database Alembic Environment Configuration
 
-Supports three separate databases:
-- ecommerce_db: B2C platforms (Uzum, Yandex)
-- classifieds_db: C2C platforms (OLX)
-- procurement_db: B2B platforms (UZEX)
+Uses ONE database (uzum_scraping) with THREE schemas:
+- ecommerce: B2C platforms (Uzum, Yandex)
+- classifieds: C2C platforms (OLX)
+- procurement: B2B platforms (UZEX)
 
 Usage:
-  alembic -n ecommerce revision --autogenerate -m "Add product features"
-  alembic -n classifieds upgrade head
-  alembic -n procurement downgrade -1
+  alembic revision -m "Add new feature"
+  alembic upgrade head
+  alembic downgrade -1
 """
 
 import os
@@ -18,34 +18,13 @@ from logging.config import fileConfig
 from pathlib import Path
 
 from alembic import context
-from sqlalchemy import engine_from_config, pool
+from sqlalchemy import engine_from_config, pool, text
 
 # Add the src directory to Python path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-# Import configurations
-from src.core.config import DatabaseType, settings
-
 # Import all models for metadata
-from src.core.models import Base as EcommerceBase
-
-# Import UZEX models for procurement database
-try:
-    from src.platforms.uzex.models import Base as ProcurementBase
-except ImportError:
-    # If UZEX models don't exist yet, create empty base
-    from sqlalchemy.ext.declarative import declarative_base
-
-    ProcurementBase = declarative_base()
-
-# Import OLX models for classifieds database (when implemented)
-try:
-    from src.platforms.olx.models import Base as ClassifiedsBase
-except ImportError:
-    # If OLX models don't exist yet, create empty base
-    from sqlalchemy.ext.declarative import declarative_base
-
-    ClassifiedsBase = declarative_base()
+from src.core.models import Base
 
 # This is the Alembic Config object
 config = context.config
@@ -54,81 +33,24 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-# Determine which database we're targeting based on the config name
-config_name = context.get_x_argument(as_dictionary=True).get("config", "alembic")
-if (
-    hasattr(context, "config")
-    and hasattr(context.config, "cmd_opts")
-    and context.config.cmd_opts
-):
-    # Check if we're using -n flag
-    if hasattr(context.config.cmd_opts, "name"):
-        config_name = context.config.cmd_opts.name or "ecommerce"
-
-# Map config names to database types and metadata
-DATABASE_CONFIG = {
-    "ecommerce": {
-        "metadata": EcommerceBase.metadata,
-        "db_type": DatabaseType.ECOMMERCE,
-        "description": "B2C E-commerce platforms (Uzum, Yandex)",
-    },
-    "classifieds": {
-        "metadata": ClassifiedsBase.metadata,
-        "db_type": DatabaseType.CLASSIFIEDS,
-        "description": "C2C Classifieds platforms (OLX)",
-    },
-    "procurement": {
-        "metadata": ProcurementBase.metadata,
-        "db_type": DatabaseType.PROCUREMENT,
-        "description": "B2B Procurement platforms (UZEX)",
-    },
-    # Default/legacy
-    "alembic": {
-        "metadata": EcommerceBase.metadata,
-        "db_type": DatabaseType.ECOMMERCE,
-        "description": "Legacy configuration (defaults to ecommerce)",
-    },
-}
-
-# Get the target database configuration
-db_config = DATABASE_CONFIG.get(config_name, DATABASE_CONFIG["ecommerce"])
-target_metadata = db_config["metadata"]
-
-print(f"🗄️  Alembic targeting: {config_name} database ({db_config['description']})")
+# Target metadata for autogenerate
+target_metadata = Base.metadata
 
 
 def get_database_url() -> str:
     """
-    Get the database URL for the current target database.
-
+    Get the database URL.
+    
     Priority:
-    1. Environment variable (e.g., ECOMMERCE_DATABASE_URL)
-    2. Config file section
-    3. Settings from config.py
+    1. Environment variable DATABASE_URL
+    2. Config file
     """
     # Try environment variable first
-    env_var_name = f"{config_name.upper()}_DATABASE_URL"
-    if env_var_name in os.environ:
-        return os.environ[env_var_name]
-
-    # Try config file section
-    try:
-        section = config.get_section(config_name, {})
-        if "sqlalchemy.url" in section:
-            return section["sqlalchemy.url"]
-    except:
-        pass
-
-    # Fall back to settings
-    if config_name == "ecommerce":
-        return settings.databases.ecommerce.url
-    elif config_name == "classifieds":
-        return settings.databases.classifieds.url
-    elif config_name == "procurement":
-        return settings.databases.procurement.url
-    else:
-        # Default to legacy database
-        return settings.databases.legacy.url
+    if "DATABASE_URL" in os.environ:
+        return os.environ["DATABASE_URL"]
+    
+    # Fall back to config file
+    return config.get_main_option("sqlalchemy.url")
 
 
 def run_migrations_offline() -> None:
@@ -177,13 +99,16 @@ def run_migrations_online() -> None:
     )
 
     with connectable.connect() as connection:
+        # Set search_path to include all schemas
+        connection.execute(text("SET search_path TO ecommerce, procurement, classifieds, public"))
+        
         context.configure(
             connection=connection,
             target_metadata=target_metadata,
             compare_type=True,
             compare_server_default=True,
-            # Include object name in version table for multi-db support
-            version_table_name=f"alembic_version_{config_name}",
+            # Include schemas in autogenerate
+            include_schemas=True,
         )
 
         with context.begin_transaction():

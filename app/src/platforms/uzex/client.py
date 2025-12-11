@@ -31,7 +31,7 @@ class UzexClient:
     SHOP_API = "https://xarid-api-shop.uzex.uz"
     TRADE_API = "https://xarid-api-trade.uzex.uz"
     
-    def __init__(self, timeout: int = 30, retries: int = 3, use_session: bool = True):
+    def __init__(self, timeout: int = 60, retries: int = 3, use_session: bool = True):
         self.timeout = timeout
         self.retries = retries
         self.use_session = use_session
