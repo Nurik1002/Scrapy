@@ -50,7 +50,8 @@ celery_app.autodiscover_tasks([
     'src.workers.process_tasks',
     'src.workers.analytics_tasks',
     'src.workers.continuous_scraper',     # NEW: Continuous scraping
-    'src.workers.maintenance_tasks',       # NEW: Maintenance tasks
+    'src.workers.uzex_continuous_scrapers',  # NEW: All 6 UZEX lot types
+    'src.workers.maintenance_tasks',       # NEW: Maintenance tasks  
     'src.workers.olx_tasks',               # OLX scraper tasks
     # Yandex removed - requires residential proxies ($50-70/mo) which we're not using
 ])

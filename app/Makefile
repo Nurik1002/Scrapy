@@ -113,45 +113,19 @@ db-status:
 	@echo "========================"
 	python manage_db.py status
 
-# Database shell - specify DB with DB=ecommerce
-DB ?= ecommerce
+# Database shell - connects to uzum_scraping with optional schema
+SCHEMA ?= ecommerce
 db-shell:
-	@echo "🐘 Opening PostgreSQL shell for $(DB)..."
-	@if [ "$(DB)" = "ecommerce" ]; then \
-		docker exec -it app-postgres-1 psql -U scraper -d ecommerce_db; \
-	elif [ "$(DB)" = "classifieds" ]; then \
-		docker exec -it app-postgres-1 psql -U scraper -d classifieds_db; \
-	elif [ "$(DB)" = "procurement" ]; then \
-		docker exec -it app-postgres-1 psql -U scraper -d procurement_db; \
-	elif [ "$(DB)" = "legacy" ]; then \
-		docker exec -it app-postgres-1 psql -U scraper -d uzum_scraping; \
-	else \
-		echo "❌ Invalid DB: $(DB). Use: ecommerce, classifieds, procurement, legacy"; \
-		exit 1; \
-	fi
+	@echo "🐘 Opening PostgreSQL shell..."
+	@echo "   Database: uzum_scraping"
+	@echo "   Schema: $(SCHEMA)"
+	docker exec -it app-postgres-1 psql -U scraper -d uzum_scraping -c "SET search_path TO $(SCHEMA),public;"
 
-# Show table counts for all databases
+# Show table counts for all schemas
 counts:
-	@echo "📊 Table Row Counts"
-	@echo "==================="
-	@echo ""
-	@echo "🛒 Ecommerce Database:"
-	@docker exec app-postgres-1 psql -U scraper -d ecommerce_db -c "\
-		SELECT schemaname,tablename,n_tup_ins-n_tup_del as rowcount \
-		FROM pg_stat_user_tables \
-		ORDER BY rowcount DESC;" 2>/dev/null || echo "   Database not accessible"
-	@echo ""
-	@echo "🏪 Classifieds Database:"
-	@docker exec app-postgres-1 psql -U scraper -d classifieds_db -c "\
-		SELECT schemaname,tablename,n_tup_ins-n_tup_del as rowcount \
-		FROM pg_stat_user_tables \
-		ORDER BY rowcount DESC;" 2>/dev/null || echo "   Database not accessible"
-	@echo ""
-	@echo "🏛️ Procurement Database:"
-	@docker exec app-postgres-1 psql -U scraper -d procurement_db -c "\
-		SELECT schemaname,tablename,n_tup_ins-n_tup_del as rowcount \
-		FROM pg_stat_user_tables \
-		ORDER BY rowcount DESC;" 2>/dev/null || echo "   Database not accessible"
+	@echo "📊 Running table counts script..."
+	@chmod +x scripts/table_counts.sh
+	@./scripts/table_counts.sh
 
 # =============================================================================
 # Migrations (Alembic)
@@ -419,7 +393,7 @@ stats:
 	@docker exec app-postgres-1 psql -U scraper -d postgres -c "\
 		SELECT datname as database, pg_size_pretty(pg_database_size(datname)) as size \
 		FROM pg_database \
-		WHERE datname IN ('ecommerce_db', 'classifieds_db', 'procurement_db', 'uzum_scraping') \
+		WHERE datname = 'uzum_scraping' \
 		ORDER BY pg_database_size(datname) DESC;" 2>/dev/null || echo "   Cannot access database"
 
 # =============================================================================
@@ -516,7 +490,7 @@ view-log:
 
 # Quick table counts
 quick-counts:
-	@docker compose exec -T postgres psql -U scraper -d uzum_scraping -c "SELECT 'products' as tbl, COUNT(*) FROM products UNION ALL SELECT 'skus', COUNT(*) FROM skus UNION ALL SELECT 'sellers', COUNT(*) FROM sellers UNION ALL SELECT 'uzex_lots', COUNT(*) FROM uzex_lots;"
+	@docker exec app-postgres-1 psql -U scraper -d uzum_scraping -c "SELECT 'products' as tbl, COUNT(*) FROM ecommerce.products UNION ALL SELECT 'skus', COUNT(*) FROM ecommerce.skus UNION ALL SELECT 'sellers', COUNT(*) FROM ecommerce.sellers UNION ALL SELECT 'uzex_lots', COUNT(*) FROM procurement.uzex_lots;"
 
 # Celery status
 celery-status:
