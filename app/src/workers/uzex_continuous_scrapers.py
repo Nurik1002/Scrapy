@@ -13,10 +13,38 @@ Total: 1.5M lots
 """
 import asyncio
 import logging
+from logging.handlers import RotatingFileHandler
+from pathlib import Path
 from celery import shared_task
 from datetime import datetime, timezone
 
+# Configure file logging
+log_dir = Path("/app/logs")
+log_dir.mkdir(exist_ok=True)
+
+# Create logger
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+
+# Add rotating file handler (10MB per file, keep 5 backups)
+file_handler = RotatingFileHandler(
+    log_dir / "uzex_scrapers.log",
+    maxBytes=10*1024*1024,  # 10MB
+    backupCount=5
+)
+file_handler.setLevel(logging.INFO)
+file_formatter = logging.Formatter(
+    '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+file_handler.setFormatter(file_formatter)
+logger.addHandler(file_handler)
+
+# Also add console handler
+console_handler = logging.StreamHandler()
+console_handler.setLevel(logging.INFO)
+console_formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+console_handler.setFormatter(console_formatter)
+logger.addHandler(console_handler)
 
 
 def run_async(coro):
