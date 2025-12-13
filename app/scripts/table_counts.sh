@@ -4,9 +4,15 @@
 
 set -e
 
-DB_CONTAINER="${DB_CONTAINER:-app-postgres-1}"
+# Auto-detect postgres container name (handles both app-postgres-1 and prefixed names)
+DB_CONTAINER=$(docker ps --format '{{.Names}}' | grep -E 'postgres' | head -1)
 DB_NAME="${DB_NAME:-uzum_scraping}"
 DB_USER="${DB_USER:-scraper}"
+
+if [ -z "$DB_CONTAINER" ]; then
+    echo "❌ Error: No PostgreSQL container running!"
+    exit 1
+fi
 
 echo "📊 Database Table Counts for $DB_NAME"
 echo "========================================"
