@@ -344,6 +344,7 @@ async def bulk_upsert_sellers(
                 "is_official": s.get("is_official", False),
                 "registration_date": s.get("registration_date"),
                 "account_id": s.get("account_id"),
+                "raw_data": s.get("raw_data"),  # FIX: Added raw_data field
                 "last_seen_at": datetime.utcnow(),
                 "updated_at": datetime.utcnow(),
             }
@@ -361,6 +362,7 @@ async def bulk_upsert_sellers(
             "total_products": stmt.excluded.total_products,
             "is_official": stmt.excluded.is_official,
             "registration_date": stmt.excluded.registration_date,
+            "raw_data": stmt.excluded.raw_data,  # FIX: Update raw_data on conflict
             "last_seen_at": stmt.excluded.last_seen_at,
             "updated_at": stmt.excluded.updated_at,
         },
@@ -456,6 +458,8 @@ async def bulk_insert_price_history(
                 "purchase_price": p.get("purchase_price"),
                 "discount_percent": p.get("discount_percent"),
                 "available_amount": p.get("available_amount", 0),
+                "price_change": p.get("price_change"),  # FIX: Added price change
+                "price_change_percent": p.get("price_change_percent"),  # FIX: Added price change percent
             }
         )
 
