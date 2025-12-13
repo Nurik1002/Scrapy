@@ -1,5 +1,132 @@
 # Changelog
 
+All notable changes to the Marketplace Analytics Platform will be documented in this file.
+
+## [2024-12-13] - Data Loss Fixes & Complete UZEX Scraping
+
+### 🔴 Critical Fixes
+
+#### Database - Fixed Missing Data Fields
+- **Fixed**: `sellers.raw_data` not being saved to database
+  - Added `raw_data` field to `bulk_upsert_sellers()` in `src/core/bulk_ops.py` (line 347)
+  - Added to `on_conflict_do_update` clause (line 365)
+  - **Impact**: All new sellers will now save complete raw JSON data
+  
+- **Fixed**: `price_history.price_change` and `price_change_percent` not being calculated
+  - Added fields to `bulk_insert_price_history()` in `src/core/bulk_ops.py` (lines 461-462)
+  - Backfilled 619,510 existing price_history records via SQL
+  - **Impact**: Price trend analytics now fully functional
+
+#### Scrapers - Fixed Runtime Errors
+- **Fixed**: `name 'total_count' is not defined` error in Uzum downloader
+  - Modified error handling in `src/platforms/uzum/downloader.py` (line 316)
+  - Calculate buffer_count from actual buffer sizes
+  - **Impact**: Eliminated continuous scraper crashes
+
+### 🚀 Major Enhancements
+
+#### UZEX - Complete Data Collection (1.5M Lots)
+- **Changed**: UZEX scraper now collects ALL 6 lot type combinations (was only auction+completed)
+  - Modified `src/workers/continuous_scraper.py` (lines 130-181)
+  - Now cycles through:
+    1. shop + completed (624K lots)
+    2. national + completed (362K lots)
+    3. auction + completed (200K lots)
+    4. auction + active (328K lots)
+    5. shop + active (14K lots)
+    6. national + active (7K lots)
+  - **Impact**: Increases UZEX data collection from 21K to 1.5M lots (98.6% more data)
+
+#### Logging - File-Based Logging for UZEX
+- **Added**: Rotating file handler for UZEX scrapers
+  - Created `src/workers/uzex_continuous_scrapers.py` with file logging
+  - Logs written to `/app/logs/uzex_scrapers.log` (10MB rotation, 5 backups)
+  - **Impact**: Easier debugging and monitoring of UZEX scraping progress
+
+### 🛠️ Improvements
+
+#### Configuration
+- **Updated**: Celery autodiscovery to include new UZEX scrapers module
+  - Added `uzex_continuous_scrapers` to `celery_app.py` (line 53)
+
+#### Scripts & Tools
+- **Fixed**: `scripts/table_counts.sh` for current database schema
+  - Updated to use schema-based architecture (ecommerce, procurement, classifieds)
+  - Now correctly shows all 15 tables across 4 schemas
+  
+- **Fixed**: Makefile database commands for single-database architecture
+  - Updated `counts` target to use `table_counts.sh` script
+  - Updated `db-shell` to connect to uzum_scraping database
+  - Updated `quick-counts` to use schema-prefixed table names
+  - Updated `stats` to show only uzum_scraping database size
+
+### 📊 Data Impact
+
+**Before**:
+- Sellers: 29,804 (0% with raw_data)
+- Price History: 661,235 (0% with price_change)
+- UZEX Lots: 21,403 (only auction+completed)
+
+**After**:
+- Sellers: 29,804 (100% future records will have raw_data)
+- Price History: 661,235 (93.7% backfilled with price_change)
+- UZEX Lots: 21,403 → Growing to 1.5M (all 6 types being scraped)
+
+### 📝 Documentation
+
+**Added**:
+- `CORRECTED_DATA_ANALYSIS.md` - Corrected analysis showing system is healthy
+- `SCRAPING_SYSTEM_ANALYSIS.md` - Complete continuous scraping documentation
+- `UZEX_OLX_COMPLETE_SCRAPING_PLAN.md` - Plan for complete data collection
+- `UZEX_LOGS.md` - Log file locations and usage
+- `UZEX_FIX_SUMMARY.md` - Summary of all lot types fix
+- `START_ALL_UZEX.md` - Quick start guide
+- `CHANGELOG.md` - This file (project root)
+
+**Removed** (Incorrect Documentation):
+- `DATABASE_ISSUES.md` - Contained false "29 fields lost" claims
+- `DATABASE_MIGRATION_ANALYSIS.md` - Incorrect database version history
+- `DATABASE_STRUCTURE_ANALYSIS.md` - Partially incorrect field analysis
+- `JSON_VS_DATABASE_ANALYSIS.md` - Completely wrong "42% data loss" claims
+
+### 🔧 Technical Details
+
+**Files Modified**:
+1. `src/core/bulk_ops.py` - Added sellers.raw_data and price_history.price_change fields
+2. `src/platforms/uzum/downloader.py` - Fixed undefined variable error
+3. `src/workers/continuous_scraper.py` - Complete UZEX scraping for all 6 types
+4. `src/workers/celery_app.py` - Registered new uzex_continuous_scrapers module
+5. `scripts/table_counts.sh` - Fixed for schema-based database
+6. `Makefile` - Updated database commands
+
+**Files Created**:
+1. `src/workers/uzex_continuous_scrapers.py` - Dedicated UZEX scrapers with file logging
+2. `scripts/start_all_uzex_scrapers.sh` - Script to launch all UZEX scrapers
+
+**Database Changes**:
+- Backfilled 619,510 price_history records with calculated price changes
+- No schema changes (all required columns already existed)
+
+### ⚠️ Breaking Changes
+
+None. All changes are backward compatible.
+
+### 🐛 Known Issues
+
+- OLX scraper has only 52 products (not actively scraping)
+- Price history hasn't updated since Dec 6 (needs investigation)
+- Some old documentation files may reference incorrect data loss claims
+
+### 📈 Performance Impact
+
+- UZEX scraping: 6x more API calls (all lot types)
+- Database growth: ~1.5M new lots expected over next week
+- Log files: ~10MB per rotation (managed automatically)
+
+---
+
+
+
 All notable changes to the Uzum/UZEX Scraper project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),

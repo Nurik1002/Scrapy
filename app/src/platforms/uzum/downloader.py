@@ -312,8 +312,17 @@ class UzumDownloader:
         except Exception as e:
             # ✅ CRITICAL: Rollback transaction on error
             await session.rollback()
+            
+            # Calculate total items in buffers
+            buffer_count = (
+                len(self._categories_buffer) +
+                len(self._products_buffer) +
+                len(self._sellers_buffer) +
+                len(self._skus_buffer)
+            )
+            
             logger.error(f"❌ DB flush error: {e}")
-            logger.error(f"⚠️  Buffers NOT cleared - will retry {total_count} items on next flush")
+            logger.error(f"⚠️  Buffers NOT cleared - will retry {buffer_count} items on next flush")
             self.stats.errors += 1
             raise  # Re-raise to trigger retry logic
     

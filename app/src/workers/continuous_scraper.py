@@ -1,20 +1,44 @@
 """
-Continuous Scraper - Non-stop scraping with automatic restart and recovery.
+Non-stop continuous scraping tasks.
 
-Features:
-- Endless loop that cycles through all product IDs
-- Automatic resume from checkpoint after crashes/restarts
-- Self-healing with retry on errors
-- Progress tracking and monitoring
+Runs continuously without schedule - uses internal loops with checkpoints.
+Each scraper has its own checkpoint to handle crashes and resume.
 """
 import asyncio
 import logging
+from logging.handlers import RotatingFileHandler
+from pathlib import Path
 from datetime import datetime, timezone, timedelta
 from typing import Optional, Dict, Any
 
 from celery import shared_task
 
+# Configure file logging
+log_dir = Path("/app/logs")
+log_dir.mkdir(exist_ok=True)
+
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+
+# Add rotating file handler (20MB per file, keep 10 backups)
+file_handler = RotatingFileHandler(
+    log_dir / "continuous_scraper.log",
+    maxBytes=20*1024*1024,  # 20MB
+    backupCount=10
+)
+file_handler.setLevel(logging.INFO)
+file_formatter = logging.Formatter(
+    '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+file_handler.setFormatter(file_formatter)
+logger.addHandler(file_handler)
+
+# Also keep console output
+console_handler = logging.StreamHandler()
+console_handler.setLevel(logging.INFO)
+console_formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+console_handler.setFormatter(console_formatter)
+logger.addHandler(console_handler)
 
 
 def run_async(coro):
@@ -130,33 +154,52 @@ def continuous_scan(
                 elif platform == "uzex":
                     from src.platforms.uzex import UzexDownloader
 
-                    downloader = UzexDownloader(batch_size=100)
-                    stats = await downloader.download_lots(
-                        lot_type="auction",
-                        status="completed",
-                        target=batch_target,
-                        start_from=current_position,
-                        resume=True,
-                        skip_existing=False  # Re-download to update & catch new lots
-                    )
+                    # ALL 6 UZEX lot types to scrape
+                    lot_types_to_scrape = [
+                        ("shop", "completed"),      # 624K lots - BIGGEST
+                        ("national", "completed"),  # 362K lots - SECOND  
+                        ("auction", "completed"),   # 200K lots
+                        ("auction", "active"),      # 328K lots
+                        ("shop", "active"),         # 14K lots
+                        ("national", "active"),     # 7K lots
+                    ]
                     
-                    total_found += stats.found
-                    current_position += 10000  # Move to next range
+                    total_found_this_cycle = 0
+                    
+                    # Scrape each lot type
+                    for lot_type, status in lot_types_to_scrape:
+                        logger.info(f"🎯 Scraping UZEX {lot_type}+{status}...")
+                        
+                        downloader = UzexDownloader(batch_size=100)
+                        stats = await downloader.download_lots(
+                            lot_type=lot_type,
+                            status=status,
+                            target=batch_target // 6,  # Split target among 6 types
+                            start_from=1,  # Always start from 1 for each type
+                            resume=True,   # Use checkpoints per type
+                            skip_existing=False
+                        )
+                        
+                        total_found_this_cycle += stats.found
+                        logger.info(f"✅ {lot_type}+{status}: Found {stats.found:,} lots")
+                    
+                    total_found += total_found_this_cycle
+                    current_position += 1  # Increment cycle counter
                     consecutive_errors = 0
                     
                     await checkpoint.save_checkpoint({
-                        "last_id": current_position,
+                        "cycle": current_position,
                         "total_found": total_found,
                         "cycles": cycles_completed,
                         "last_run": datetime.now(timezone.utc).isoformat(),
                     })
                     
-                    logger.info(f"📊 UZEX Progress: {total_found:,} lots found")
+                    logger.info(f"📊 UZEX Cycle {current_position}: {total_found_this_cycle:,} new lots, {total_found:,} total")
                     
-                    # UZEX has less data, longer pause
-                    await asyncio.sleep(60)
+                    # Pause between full cycles (all 6 types)
+                    await asyncio.sleep(300)  # 5 min between cycles
                     
-                    if current_position >= max_id:
+                    if current_position >= 10:  # After 10 full cycles, longer pause
                         cycles_completed += 1
                         current_position = 1
                         await asyncio.sleep(pause_between_cycles)
