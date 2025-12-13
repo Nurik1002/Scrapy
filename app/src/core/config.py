@@ -213,7 +213,7 @@ PLATFORMS = {
         requires_proxy=True,  # Essential for Yandex Market
         requires_session=True,  # Session persistence needed
         rate_limit=60,  # 60 requests per minute max
-        enabled=True,  # Now implemented
+        enabled=False,  # DISABLED: Requires residential proxies ($50-70/mo) - user opted out
     ),
     # C2C Classifieds Platforms
     "olx": PlatformConfig(

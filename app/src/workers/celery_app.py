@@ -52,8 +52,7 @@ celery_app.autodiscover_tasks([
     'src.workers.continuous_scraper',     # NEW: Continuous scraping
     'src.workers.maintenance_tasks',       # NEW: Maintenance tasks
     'src.workers.olx_tasks',               # OLX scraper tasks
-    'src.workers.yandex_tasks',            # ENABLED: Yandex Market scraper (847 lines)
-    'src.workers.yandex_continuous',       # ENABLED: Yandex continuous non-stop scraper
+    # Yandex removed - requires residential proxies ($50-70/mo) which we're not using
 ])
 
 # ==============================================================================

@@ -302,16 +302,20 @@ class UzumDownloader:
                         await bulk_upsert_skus(session, chunk)
                 
                 await session.commit()
+                
+                # ✅ Only clear buffers AFTER successful commit
+                self._categories_buffer.clear()
+                self._products_buffer.clear()
+                self._sellers_buffer.clear()
+                self._skus_buffer.clear()
             
         except Exception as e:
-            logger.error(f"DB flush error: {e}")
+            # ✅ CRITICAL: Rollback transaction on error
+            await session.rollback()
+            logger.error(f"❌ DB flush error: {e}")
+            logger.error(f"⚠️  Buffers NOT cleared - will retry {total_count} items on next flush")
             self.stats.errors += 1
-        finally:
-            # CRITICAL: Clear buffers even on error to prevent infinite accumulation
-            self._categories_buffer.clear()  # NEW
-            self._products_buffer.clear()
-            self._sellers_buffer.clear()
-            self._skus_buffer.clear()
+            raise  # Re-raise to trigger retry logic
     
     def _log_progress(self):
         """Log current progress."""

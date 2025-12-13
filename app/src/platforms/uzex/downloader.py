@@ -358,14 +358,18 @@ class UzexDownloader:
                     logger.info(f"Bulk inserting {len(items_list)} UZEX lot items")
 
                 await session.commit()
+                
+                # ✅ Only clear buffers AFTER successful commit
+                self._lots_buffer.clear()
+                self._items_buffer.clear()
 
         except Exception as e:
-            logger.error(f"DB flush error: {e}")
+            # ✅ CRITICAL: Rollback transaction on error
+            await session.rollback()
+            logger.error(f"❌ DB flush error: {e}")
+            logger.error(f"⚠️  Buffers NOT cleared - will retry on next flush")
             self.stats.errors += 1
-        finally:
-            # CRITICAL: Clear buffers even on error to prevent infinite accumulation
-            self._lots_buffer.clear()
-            self._items_buffer.clear()
+            raise  # Re-raise to trigger retry logic
 
 
 async def main():
